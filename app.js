@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const canvas = $('#canvas'), layer = $('#node-layer'), svg = $('#connections');
-let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null;
+let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree';
 let undoStack = [], redoStack = [];
 const starter = () => ({ title:'アイデアを育てよう', nodes:[
   {id:'root',text:'新しいアイデア',x:520,y:310,parent:null,color:'root'},
@@ -51,7 +51,7 @@ function autoLayout(type='tree'){
   const before=copyMap(), leaves=[];
   const children=id=>map.nodes.filter(n=>n.parent===id);
   const place=(node,depth)=>{ const kids=children(node.id); if(!kids.length){ if(type==='tree')node.x=90+leaves.length*190; else node.y=90+leaves.length*105; leaves.push(node); } else { kids.forEach(k=>place(k,depth+1)); if(type==='tree')node.x=kids.reduce((sum,k)=>sum+k.x,0)/kids.length; else node.y=kids.reduce((sum,k)=>sum+k.y,0)/kids.length; } if(type==='tree')node.y=90+depth*125; else node.x=90+depth*210; };
-  const root=map.nodes.find(n=>!n.parent); if(!root)return; place(root,0); persist(); recordChange(before); draw(); setLayoutButton(type); toast(type==='tree'?'ツリーに整列しました':'横展開に整列しました');
+  const root=map.nodes.find(n=>!n.parent); if(!root)return; place(root,0); currentLayout=type; persist(); recordChange(before); draw(); setLayoutButton(type); toast(type==='tree'?'ツリーに整列しました':'横展開に整列しました');
 }
 function mapBounds(){
   const nodes=visibleNodes(), widths=nodes.map(n=>(layer.querySelector(`[data-id="${n.id}"]`)?.offsetWidth||130)), heights=nodes.map(n=>(layer.querySelector(`[data-id="${n.id}"]`)?.offsetHeight||46));
@@ -143,7 +143,7 @@ function editNode(id,el){
     }
   });
 }
-function addNode(sibling=false){ const before=copyMap(); const base=get(selectedId)||get('root'); const parent=sibling ? get(base.parent)||base : base; const siblings=map.nodes.filter(n=>n.parent===parent.id); const node={id:crypto.randomUUID(),text:'新しいノード',parent:parent.id,x:parent.x+(parent.x<520?-220:220),y:parent.y+(siblings.length-1)*78+75}; map.nodes.push(node); selectedId=node.id; persist();recordChange(before);draw(); editNode(node.id,layer.querySelector(`[data-id="${node.id}"] .node-label`)); }
+function addNode(sibling=false){ const before=copyMap(); const base=get(selectedId)||get('root'); const parent=sibling ? get(base.parent)||base : base; const siblings=map.nodes.filter(n=>n.parent===parent.id); const index=siblings.length; const node={id:crypto.randomUUID(),text:'新しいノード',parent:parent.id,x:currentLayout==='horizontal'?parent.x+210:parent.x+index*145,y:currentLayout==='horizontal'?parent.y+index*92:parent.y+125}; map.nodes.push(node); selectedId=node.id; persist();recordChange(before);draw(); editNode(node.id,layer.querySelector(`[data-id="${node.id}"] .node-label`)); }
 function remove(){ const n=get(selectedId); if(!n||!n.parent){toast('中心ノードは削除できません');return;} const before=copyMap(); const ids=new Set([n.id]); let changed=true; while(changed){changed=false;map.nodes.forEach(x=>{if(ids.has(x.parent)&&!ids.has(x.id)){ids.add(x.id);changed=true;}})} map.nodes=map.nodes.filter(x=>!ids.has(x.id));selectedId=n.parent;persist();recordChange(before);draw(); }
 function startNodeDrag(e){
   if(e.target.contentEditable==='true') return;

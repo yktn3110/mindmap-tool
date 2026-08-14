@@ -153,6 +153,21 @@ test('horizontal layout places children to the right of their parent and switche
   await expect(page.locator('#auto-layout')).toHaveClass(/active/);
 });
 
+test('new child placement follows the active layout direction', async ({ page }) => {
+  const positions=async () => page.evaluate(() => { const data=JSON.parse(localStorage.getItem('mindflow-map')), root=data.nodes.find(n=>n.id==='root'), added=data.nodes.find(n=>n.text==='新しいノード'); return {root,added}; });
+  await page.locator('#horizontal-layout').click();
+  await page.locator('.node.root').click();
+  await page.keyboard.press('Tab');
+  let result=await positions();
+  expect(result.added.x).toBeGreaterThan(result.root.x);
+  await page.reload();
+  await page.locator('#auto-layout').click();
+  await page.locator('.node.root').click();
+  await page.keyboard.press('Tab');
+  result=await positions();
+  expect(result.added.y).toBeGreaterThan(result.root.y);
+});
+
 test('fit view scales and centers every node inside the canvas', async ({ page }) => {
   await page.locator('#horizontal-layout').click();
   await page.locator('#fit-view').click();

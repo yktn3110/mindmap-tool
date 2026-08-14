@@ -185,7 +185,7 @@ $('#node-search').oninput=searchNodes;
 $('#map-title').addEventListener('focus',e=>e.target.dataset.before=JSON.stringify(copyMap()));$('#map-title').addEventListener('change',e=>{const before=JSON.parse(e.target.dataset.before||JSON.stringify(copyMap()));persist();recordChange(before);});$('#new-btn').onclick=()=>{if(confirm('現在のマップを新しくしますか？')){const before=copyMap();map=starter();selectedId=undefined;scale=1;pan={x:0,y:0};persist();recordChange(before);draw();}};
 $('#export-btn').onclick=()=>{persist();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(map,null,2)],{type:'application/json'}));a.download=(map.title||'mindmap')+'.json';a.click();URL.revokeObjectURL(a.href);toast('マップを書き出しました');};$('#import-btn').onclick=()=>$('#file-input').click();$('#file-input').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!Array.isArray(v.nodes))throw 0;const before=copyMap();map=v;selectedId=undefined;persist();recordChange(before);draw();toast('マップを読み込みました');}catch{toast('有効なマップファイルではありません');}};r.readAsText(f);};
 document.addEventListener('keydown',e=>{
-  if(document.activeElement.isContentEditable || document.activeElement===$('#map-title')) return;
+  if(document.activeElement.isContentEditable || document.activeElement.matches('input, textarea, select')) return;
   if((e.ctrlKey||e.metaKey) && !e.altKey && e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); }
   else if((e.ctrlKey||e.metaKey) && !e.altKey && e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); }
   else if(e.key==='Tab'){ e.preventDefault(); addNode(); }

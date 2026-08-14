@@ -111,6 +111,16 @@ test('a node can have its color, icon, and note changed and saved', async ({ pag
   await expect(page.locator('#note-preview')).toBeVisible();
 });
 
+test('Backspace in a note edits text without deleting the selected node', async ({ page }) => {
+  const node=page.locator('.node').filter({hasText:'やりたいこと'});
+  await node.click();
+  const note=page.locator('#node-note');
+  await note.fill('メモX');
+  await note.press('Backspace');
+  await expect(note).toHaveValue('メモ');
+  await expect(node).toHaveCount(1);
+});
+
 test('tree layout rearranges nodes and can be undone', async ({ page }) => {
   const root = page.locator('.node.root');
   const before = await root.getAttribute('style');

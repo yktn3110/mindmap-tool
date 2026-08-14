@@ -97,6 +97,10 @@ test('a node can have its color, icon, and note changed and saved', async ({ pag
   await expect(node).toHaveAttribute('style', /--node-color: #43a77b/);
   await expect(node).toHaveCSS('border-left-color', 'rgb(67, 167, 123)');
   await expect(node).toHaveCSS('background-color', 'rgb(225, 241, 234)');
+  await page.locator('#color-picker button[aria-label="色なし"]').click();
+  await expect(node).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(node).not.toHaveAttribute('style', /--node-color/);
+  await page.locator('#color-picker button[data-color="#43a77b"]').click();
   await page.locator('#node-icon').selectOption('💡');
   await expect(node.locator('.node-icon')).toHaveText('💡 ');
   const note = page.locator('#node-note');

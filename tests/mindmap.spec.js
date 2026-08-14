@@ -90,6 +90,32 @@ test('double-clicking a selected node selects all of its text for editing', asyn
   await expect.poll(() => page.evaluate(() => window.getSelection().toString())).toBe('やりたいこと');
 });
 
+test('clicking inside an edited node moves the caret instead of reselecting all text', async ({ page }) => {
+  const node=page.locator('.node').filter({hasText:'やりたいこと'});
+  const label=node.locator('.node-label');
+  await node.dblclick();
+  await expect.poll(() => page.evaluate(() => window.getSelection().toString())).toBe('やりたいこと');
+  const box=await label.boundingBox();
+  await page.mouse.click(box.x+box.width-3,box.y+box.height/2);
+  const selection=await page.evaluate(() => {const range=window.getSelection();return {collapsed:range.isCollapsed,offset:range.focusOffset,text:range.focusNode?.textContent};});
+  expect(selection.collapsed).toBeTruthy();
+  expect(selection.offset).toBeGreaterThan(0);
+  expect(selection.text).toContain('やりたいこと');
+});
+
+test('clicking text in a selected node starts editing at the clicked position', async ({ page }) => {
+  const node=page.locator('.node').filter({hasText:'やりたいこと'});
+  const label=node.locator('.node-label');
+  await node.click();
+  await expect(node).toHaveClass(/selected/);
+  const box=await label.boundingBox();
+  await page.mouse.click(box.x+box.width-3,box.y+box.height/2);
+  await expect(label).toHaveAttribute('contenteditable','true');
+  const selection=await page.evaluate(() => {const range=window.getSelection();return {collapsed:range.isCollapsed,offset:range.focusOffset};});
+  expect(selection.collapsed).toBeTruthy();
+  expect(selection.offset).toBeGreaterThan(0);
+});
+
 test('a node can have its color, icon, and note changed and saved', async ({ page }) => {
   const node = page.locator('.node').filter({ hasText: 'やりたいこと' });
   await node.click();

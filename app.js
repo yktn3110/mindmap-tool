@@ -85,7 +85,7 @@ function draw(){
   const visible=visibleNodes();
   visible.forEach(n=>{
     const el=document.createElement('div'); el.className='node'+(n.id==='root'?' root':'')+(n.id===selectedId?' selected':''); el.dataset.id=n.id; el.style.left=n.x+'px'; el.style.top=n.y+'px'; if(n.color){el.style.setProperty('--node-color',n.color);el.style.setProperty('--node-background',mixWithWhite(n.color));el.style.setProperty('--node-border',n.color);el.style.setProperty('--node-text',n.color);}
-    const icon=document.createElement('span');icon.className='node-icon';icon.textContent=n.icon ? n.icon+' ' : ''; const label=document.createElement('span');label.className='node-label';label.textContent=n.text;el.append(icon,label);if(n.note){const noteMark=document.createElement('span');noteMark.className='note-indicator';noteMark.setAttribute('aria-label','補足メモあり');noteMark.title='補足メモあり';noteMark.textContent='▤';el.append(noteMark);}
+    const icon=document.createElement('span');icon.className='node-icon';icon.textContent=n.icon ? n.icon+' ' : ''; const label=document.createElement('span');label.className='node-label';label.textContent=n.text;label.addEventListener('mousedown',e=>{if(label.isContentEditable)e.stopPropagation();});label.addEventListener('click',e=>{if(label.isContentEditable)e.stopPropagation();});el.append(icon,label);if(n.note){const noteMark=document.createElement('span');noteMark.className='note-indicator';noteMark.setAttribute('aria-label','補足メモあり');noteMark.title='補足メモあり';noteMark.textContent='▤';el.append(noteMark);}
     if(childrenOf(n.id).length){const toggle=document.createElement('button');toggle.className='collapse-toggle';toggle.type='button';toggle.dataset.id=n.id;toggle.setAttribute('aria-label',n.collapsed?'子ノードを展開':'子ノードを折り畳む');toggle.textContent=n.collapsed?'＋':'−';toggle.addEventListener('mousedown',e=>e.stopPropagation());toggle.addEventListener('click',e=>{e.stopPropagation();toggleCollapse(n.id);});el.append(toggle);}
     el.addEventListener('dblclick',e=>editNode(n.id,e.currentTarget.querySelector('.node-label'))); el.addEventListener('mousedown',startNodeDrag); el.addEventListener('click',()=>select(n.id)); layer.append(el);
   });
@@ -115,17 +115,19 @@ function searchNodes(){
   results.innerHTML=matches.length ? '' : '<p class="search-empty">該当するノードはありません</p>';
   matches.forEach(n=>{const button=document.createElement('button');button.className='search-result';button.textContent=n.icon?`${n.icon} ${n.text}`:n.text;button.onclick=()=>focusNode(n.id);results.append(button);});
 }
-function editNode(id,el){
+function editNode(id,el,selectAll=true){
   const before=copyMap();
   selectedId=id;
   select(id);
   el.contentEditable='true';
   el.focus();
-  const range=document.createRange();
-  range.selectNodeContents(el);
-  const selection=window.getSelection();
-  selection.removeAllRanges();
-  selection.addRange(range);
+  if(selectAll){
+    const range=document.createRange();
+    range.selectNodeContents(el);
+    const selection=window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
   const finish=()=>{
     const text=el.textContent.trim();
     if(text) get(id).text=text;
@@ -146,9 +148,11 @@ function editNode(id,el){
 function addNode(sibling=false){ const before=copyMap(); const base=get(selectedId)||get('root'); const parent=sibling ? get(base.parent)||base : base; const siblings=map.nodes.filter(n=>n.parent===parent.id); const index=siblings.length; const node={id:crypto.randomUUID(),text:'新しいノード',parent:parent.id,x:currentLayout==='horizontal'?parent.x+210:parent.x+index*145,y:currentLayout==='horizontal'?parent.y+index*92:parent.y+125}; map.nodes.push(node); selectedId=node.id; persist();recordChange(before);draw(); editNode(node.id,layer.querySelector(`[data-id="${node.id}"] .node-label`)); }
 function remove(){ const n=get(selectedId); if(!n||!n.parent){toast('中心ノードは削除できません');return;} const before=copyMap(); const ids=new Set([n.id]); let changed=true; while(changed){changed=false;map.nodes.forEach(x=>{if(ids.has(x.parent)&&!ids.has(x.id)){ids.add(x.id);changed=true;}})} map.nodes=map.nodes.filter(x=>!ids.has(x.id));selectedId=n.parent;persist();recordChange(before);draw(); }
 function startNodeDrag(e){
-  if(e.target.contentEditable==='true') return;
-  e.stopPropagation();
   const n=get(e.currentTarget.dataset.id);
+  const label=e.target.closest('.node-label');
+  if(label && selectedId===n.id && !label.isContentEditable && e.detail===1){ editNode(n.id,label,false); e.stopPropagation(); return; }
+  if(e.target.contentEditable==='true'){ e.stopPropagation(); return; }
+  e.stopPropagation();
   drag={type:'node',node:n,startX:e.clientX,startY:e.clientY,x:n.x,y:n.y,moved:false,before:copyMap()};
   canvas.focus({preventScroll:true});
 }

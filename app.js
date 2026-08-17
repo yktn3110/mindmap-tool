@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const canvas = $('#canvas'), layer = $('#node-layer'), svg = $('#connections');
-let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree', hasUnsavedChanges = false, currentFileHandle = null, cutNodeId = null, autoSaveTimer = null;
+let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree', hasUnsavedChanges = false, hasSavedVersion = false, currentFileHandle = null, cutNodeId = null, autoSaveTimer = null;
 let undoStack = [], redoStack = [];
 const starter = () => ({ nodes:[
   {id:'root',text:'新しいアイデア',x:520,y:310,parent:null,color:'root'},
@@ -17,9 +17,9 @@ function childrenOf(id){ return map.nodes.filter(n=>n.parent===id); }
 function visibleNodes(){ const output=[]; const visit=node=>{output.push(node);if(!node.collapsed)childrenOf(node.id).forEach(visit);}; const root=map.nodes.find(n=>!n.parent);if(root)visit(root);return output; }
 function copyMap(value=map){ return JSON.parse(JSON.stringify(value)); }
 function updateSaveStatus(text,dirty=hasUnsavedChanges){const status=$('#save-status');status.textContent=text;status.classList.toggle('dirty',dirty);status.title=dirty?'変更があります。保存してから閉じてください。':'保存が必要な変更はありません。';}
-function markDirty(){hasUnsavedChanges=true;updateSaveStatus('未保存');}
-function markSaved(){hasUnsavedChanges=false;const time=new Intl.DateTimeFormat('ja-JP',{hour:'2-digit',minute:'2-digit'}).format(new Date());updateSaveStatus(`保存済み ${time}`);}
-function markOpened(filename){hasUnsavedChanges=false;updateSaveStatus(`開きました: ${filename}`,false);}
+function markDirty(){hasUnsavedChanges=true;updateSaveStatus(hasSavedVersion?'更新あり':'未保存（新規）');}
+function markSaved(){hasUnsavedChanges=false;hasSavedVersion=true;const time=new Intl.DateTimeFormat('ja-JP',{hour:'2-digit',minute:'2-digit'}).format(new Date());updateSaveStatus(`保存済み ${time}`);}
+function markOpened(filename){hasUnsavedChanges=false;hasSavedVersion=true;updateSaveStatus(`保存済み: ${filename}`,false);}
 function mapName(){return $('#map-title').value.trim()||'無題のマップ';}
 function persist(){ markDirty(); }
 function mapJson(){const data=copyMap();delete data.title;return JSON.stringify(data,null,2);}
@@ -210,7 +210,7 @@ $('#auto-layout').onclick=()=>autoLayout('tree');$('#horizontal-layout').onclick
 $('#export-png-btn').onclick=exportPng;$('#export-pdf-btn').onclick=exportPdf;
 $('#color-picker').onclick=e=>{if(!e.target.matches('button[data-color]')||!get(selectedId))return;const before=copyMap();get(selectedId).color=e.target.dataset.color||undefined;persist();recordChange(before);draw();select(selectedId);};$('#node-icon').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).icon=e.target.value;persist();recordChange(before);draw();select(selectedId);};$('#node-note').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).note=e.target.value;persist();recordChange(before);draw();select(selectedId);};
 $('#node-search').oninput=searchNodes;
-$('#new-btn').onclick=()=>{if(confirm('現在のマップを新しくしますか？')){const before=copyMap();map=starter();$('#map-title').value='無題のマップ';currentFileHandle=null;updateOverwriteButton();selectedId=undefined;scale=1;pan={x:0,y:0};persist();recordChange(before);draw();}};
+$('#new-btn').onclick=()=>{if(confirm('現在のマップを新しくしますか？')){const before=copyMap();map=starter();$('#map-title').value='無題のマップ';hasSavedVersion=false;currentFileHandle=null;updateOverwriteButton();selectedId=undefined;scale=1;pan={x:0,y:0};persist();recordChange(before);draw();}};
 function loadMapFile(file,handle=null){const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!Array.isArray(v.nodes))throw 0;const before=copyMap();map=v;$('#map-title').value=file.name.replace(/\.json$/i,'')||'無題のマップ';delete map.title;currentFileHandle=handle;updateOverwriteButton();selectedId=undefined;recordChange(before);draw();markOpened(file.name);toast('マップを開きました');}catch{toast('有効なマップファイルではありません');}};r.readAsText(file);}
 async function openMap(){if(!window.showOpenFilePicker){$('#file-input').click();return;}try{const [handle]=await window.showOpenFilePicker({types:[{description:'Mindflow map',accept:{'application/json':['.json']}}]});loadMapFile(await handle.getFile(),handle);}catch(error){if(error.name!=='AbortError')toast('ファイルを開けませんでした');}}
 $('#export-btn').onclick=saveAs;$('#overwrite-btn').onclick=saveOverwrite;$('#import-btn').onclick=openMap;$('#file-input').onchange=e=>{const f=e.target.files[0];if(f)loadMapFile(f);};
@@ -224,7 +224,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); remove(); }
 }, true);
 window.addEventListener('beforeunload',e=>{if(!hasUnsavedChanges)return;e.preventDefault();e.returnValue='';});
-updateSaveStatus('変更なし',false);
+updateSaveStatus('未保存（新規）',false);
 updateOverwriteButton();
 updateHistoryButtons();
 draw();

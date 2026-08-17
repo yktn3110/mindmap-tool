@@ -28,10 +28,10 @@ test('Tab adds a child node instead of moving browser focus', async ({ page }) =
 
 test('save status changes after editing and JSON export', async ({ page }) => {
   await page.evaluate(() => { window.showSaveFilePicker = undefined; });
-  await expect(page.locator('#save-status')).toHaveText('変更なし');
+  await expect(page.locator('#save-status')).toHaveText('未保存（新規）');
   await page.locator('.node.root').click();
   await page.keyboard.press('Tab');
-  await expect(page.locator('#save-status')).toHaveText('未保存');
+  await expect(page.locator('#save-status')).toHaveText('未保存（新規）');
   await expect(page.locator('#save-status')).toHaveClass(/dirty/);
   await expect(page.locator('#export-btn')).toHaveText('名前を付けて保存');
   await expect(page.locator('#import-btn')).toHaveText('開く');
@@ -90,7 +90,7 @@ test('opening a map updates the visible title from the JSON file', async ({ page
   });
   await expect(page.locator('#map-title')).toHaveValue('project-map');
   await expect(page.locator('.node.root')).toHaveText('計画');
-  await expect(page.locator('#save-status')).toHaveText('開きました: project-map.json');
+  await expect(page.locator('#save-status')).toHaveText('保存済み: project-map.json');
   await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
 });
 
@@ -109,7 +109,7 @@ test('opening a file in Chrome mode sets the title and enables overwrite save', 
   await expect(page.locator('#map-title')).toHaveValue('existing');
   await expect(page.locator('#overwrite-btn')).toBeEnabled();
   await expect(page.locator('.node.root')).toHaveText('既存ノード');
-  await expect(page.locator('#save-status')).toHaveText('開きました: existing.json');
+  await expect(page.locator('#save-status')).toHaveText('保存済み: existing.json');
   await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
 });
 
@@ -118,7 +118,8 @@ test('open, add a node, and overwrite save updates the opened file', async ({ pa
   await page.locator('#import-btn').click();
   await page.locator('.node.root').click();
   await page.keyboard.press('Tab');
-  await expect(page.locator('#save-status')).toHaveText('未保存');
+  await expect(page.locator('#save-status')).toHaveText('更新あり');
+  await expect(page.locator('#save-status')).toHaveClass(/dirty/);
   await page.locator('#overwrite-btn').click();
   await expect.poll(()=>page.evaluate(()=>window.__openedFileWrites.length)).toBe(1);
   const saved=await page.evaluate(()=>JSON.parse(window.__openedFileWrites[0]));
@@ -377,6 +378,6 @@ test('dragging blank canvas pans the map', async ({ page }) => {
   await page.mouse.move(box.x + 160, box.y + 550, { steps: 5 });
   await page.mouse.up();
   await expect(layer).not.toHaveAttribute('style', `transform: ${before};`);
-  await expect(page.locator('#save-status')).toHaveText('変更なし');
+  await expect(page.locator('#save-status')).toHaveText('未保存（新規）');
   await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
 });

@@ -366,4 +366,6 @@ test('dragging blank canvas pans the map', async ({ page }) => {
   await page.mouse.move(box.x + 160, box.y + 550, { steps: 5 });
   await page.mouse.up();
   await expect(layer).not.toHaveAttribute('style', `transform: ${before};`);
+  await expect(page.locator('#save-status')).toHaveText('変更なし');
+  await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
 });

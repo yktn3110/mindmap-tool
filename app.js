@@ -195,7 +195,7 @@ window.addEventListener('mousemove',e=>{
 window.addEventListener('mouseup',()=>{
   if(!drag) return;
   if(drag.type==='node' && !drag.moved) select(drag.node.id);
-  if(drag.moved){ persist(); if(drag.type==='node') recordChange(drag.before); }
+  if(drag.moved&&drag.type==='node'){ persist(); recordChange(drag.before); }
   drag=null;
 });
 canvas.addEventListener('wheel',e=>{e.preventDefault();scale=Math.max(.45,Math.min(1.8,scale+(e.deltaY<0?.08:-.08)));draw();},{passive:false});

@@ -27,18 +27,30 @@ test('Tab adds a child node instead of moving browser focus', async ({ page }) =
 });
 
 test('save status changes after editing and JSON export', async ({ page }) => {
+  await page.evaluate(() => { window.showSaveFilePicker = undefined; });
   await expect(page.locator('#save-status')).toHaveText('変更なし');
   await page.locator('.node.root').click();
   await page.keyboard.press('Tab');
   await expect(page.locator('#save-status')).toHaveText('未保存');
   await expect(page.locator('#save-status')).toHaveClass(/dirty/);
-  await expect(page.locator('#export-btn')).toHaveText('保存');
+  await expect(page.locator('#export-btn')).toHaveText('名前を付けて保存');
   await expect(page.locator('#import-btn')).toHaveText('開く');
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#export-btn').click();
   await downloadPromise;
   await expect(page.locator('#save-status')).toHaveText(/保存済み/);
   await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
+});
+
+test('save as enables overwriting the same JSON file', async ({ page }) => {
+  await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'test-map.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
+  await page.locator('.node.root').click();
+  await page.keyboard.press('Tab');
+  await page.locator('#export-btn').click();
+  await expect(page.locator('#overwrite-btn')).toBeEnabled();
+  await page.locator('#overwrite-btn').click();
+  await expect.poll(()=>page.evaluate(()=>window.__mindflowWrites.length)).toBe(2);
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(window.__mindflowWrites[1]).nodes.some(node=>node.text==='新しいノード'))).toBeTruthy();
 });
 
 test('closing a page with unsaved changes shows a browser warning', async ({ page }) => {
@@ -149,6 +161,7 @@ test('clicking text in a selected node starts editing at the clicked position', 
 });
 
 test('a node can have its color, icon, and note configured and exported', async ({ page }) => {
+  await page.evaluate(() => { window.showSaveFilePicker = undefined; });
   const node = page.locator('.node').filter({ hasText: 'やりたいこと' });
   await node.click();
   await page.locator('#color-picker button[data-color="#43a77b"]').click();

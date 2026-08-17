@@ -109,6 +109,8 @@ test('opening a file in Chrome mode sets the title and enables overwrite save', 
   await expect(page.locator('#map-title')).toHaveValue('existing');
   await expect(page.locator('#overwrite-btn')).toBeEnabled();
   await expect(page.locator('.node.root')).toHaveText('既存ノード');
+  await expect(page.locator('#save-status')).toHaveText('開きました: existing.json');
+  await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
 });
 
 test('open, add a node, and overwrite save updates the opened file', async ({ page }) => {

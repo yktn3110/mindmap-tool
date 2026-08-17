@@ -137,6 +137,20 @@ function searchNodes(){
   results.innerHTML=matches.length ? '' : '<p class="search-empty">該当するノードはありません</p>';
   matches.forEach(n=>{const button=document.createElement('button');button.className='search-result';button.textContent=n.icon?`${n.icon} ${n.text}`:n.text;button.onclick=()=>focusNode(n.id);results.append(button);});
 }
+function insertLineBreak(el){
+  const selection=window.getSelection();
+  if(!selection?.rangeCount)return;
+  const range=selection.getRangeAt(0);
+  if(!el.contains(range.commonAncestorContainer))return;
+  range.deleteContents();
+  const lineBreak=document.createElement('br'), cursor=document.createTextNode('\u200B'), fragment=document.createDocumentFragment();
+  fragment.append(lineBreak,cursor);
+  range.insertNode(fragment);
+  range.setStartAfter(cursor);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
 function editNode(id,el,selectAll=true){
   const before=copyMap();
   selectedId=id;
@@ -151,7 +165,7 @@ function editNode(id,el,selectAll=true){
     selection.addRange(range);
   }
   const finish=()=>{
-    const text=el.textContent.trim();
+    const text=[...el.childNodes].map(child=>child.nodeName==='BR'?'\n':child.textContent).join('').replaceAll('\u200B','').trim();
     if(text){
       get(id).text=text;
       el.textContent=text;
@@ -162,7 +176,7 @@ function editNode(id,el,selectAll=true){
   };
   el.addEventListener('blur',finish,{once:true});
   el.addEventListener('keydown',e=>{
-    if(e.key==='Enter'&&e.shiftKey){ e.preventDefault(); document.execCommand('insertText',false,'\n'); }
+    if(e.key==='Enter'&&e.shiftKey){ e.preventDefault(); insertLineBreak(el); }
     else if(e.key==='Enter'){ e.preventDefault(); el.blur(); }
     if(e.key==='Tab'){
       e.preventDefault();

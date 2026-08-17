@@ -77,6 +77,8 @@ test('opening a map updates the visible title from the JSON file', async ({ page
   });
   await expect(page.locator('#map-title')).toHaveValue('プロジェクト計画');
   await expect(page.locator('.node.root')).toHaveText('計画');
+  await expect(page.locator('#save-status')).toHaveText('開きました: project-map.json');
+  await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
 });
 
 test('opening a map with the default title uses its filename as the title', async ({ page }) => {

@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('node:fs/promises');
 const { createMindflowServer } = require('../server.js');
 
 let server;
@@ -46,6 +47,12 @@ test('closing a page with unsaved changes shows a browser warning', async ({ pag
   const dialog=await dialogPromise;
   expect(dialog.type()).toBe('beforeunload');
   await dialog.dismiss();
+});
+
+test('editing does not save data to browser storage', async ({ page }) => {
+  await page.locator('.node.root').click();
+  await page.keyboard.press('Tab');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('mindflow-map'))).toBeNull();
 });
 
 test('Tab adds a child while the node created by the previous Tab is being edited', async ({ page }) => {
@@ -139,7 +146,7 @@ test('clicking text in a selected node starts editing at the clicked position', 
   expect(selection.offset).toBeGreaterThan(0);
 });
 
-test('a node can have its color, icon, and note changed and saved', async ({ page }) => {
+test('a node can have its color, icon, and note configured and exported', async ({ page }) => {
   const node = page.locator('.node').filter({ hasText: 'やりたいこと' });
   await node.click();
   await page.locator('#color-picker button[data-color="#43a77b"]').click();
@@ -158,10 +165,11 @@ test('a node can have its color, icon, and note changed and saved', async ({ pag
   await expect(node.locator('.note-indicator')).toHaveCount(1);
   await expect(page.locator('#note-preview')).toBeVisible();
   await expect(page.locator('#note-preview-text')).toHaveText('次回までに調査する');
-  await page.reload();
-  await page.locator('.node').filter({ hasText: 'やりたいこと' }).click();
-  await expect(page.locator('#node-note')).toHaveValue('次回までに調査する');
-  await expect(page.locator('#note-preview')).toBeVisible();
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#export-btn').click();
+  const download=await downloadPromise;
+  const saved=JSON.parse(await fs.readFile(await download.path(),'utf8'));
+  expect(saved.nodes.find(item=>item.text==='やりたいこと').note).toBe('次回までに調査する');
 });
 
 test('Backspace in a note edits text without deleting the selected node', async ({ page }) => {
@@ -185,25 +193,17 @@ test('tree layout rearranges nodes and can be undone', async ({ page }) => {
 
 test('horizontal layout places children to the right of their parent and switches back to tree', async ({ page }) => {
   await page.locator('#horizontal-layout').click();
-  const positions = await page.evaluate(() => {
-    const data=JSON.parse(localStorage.getItem('mindflow-map'));
-    const root=data.nodes.find(n=>n.id==='root'), child=data.nodes.find(n=>n.parent==='root');
-    return {root,child};
-  });
+  const positions = await page.evaluate(() => {const node=id=>document.querySelector(`[data-id="${id}"]`);const root=node('root'),child=[...document.querySelectorAll('.node')].find(el=>el.dataset.id!=='root'&&el.style.left);return {root:{x:parseFloat(root.style.left),y:parseFloat(root.style.top)},child:{x:parseFloat(child.style.left),y:parseFloat(child.style.top)}};});
   expect(positions.child.x).toBeGreaterThan(positions.root.x);
   await expect(page.locator('#horizontal-layout')).toHaveClass(/active/);
   await page.locator('#auto-layout').click();
-  const treePositions = await page.evaluate(() => {
-    const data=JSON.parse(localStorage.getItem('mindflow-map'));
-    const root=data.nodes.find(n=>n.id==='root'), child=data.nodes.find(n=>n.parent==='root');
-    return {root,child};
-  });
+  const treePositions = await page.evaluate(() => {const node=id=>document.querySelector(`[data-id="${id}"]`);const root=node('root'),child=[...document.querySelectorAll('.node')].find(el=>el.dataset.id!=='root');return {root:{x:parseFloat(root.style.left),y:parseFloat(root.style.top)},child:{x:parseFloat(child.style.left),y:parseFloat(child.style.top)}};});
   expect(treePositions.child.y).toBeGreaterThan(treePositions.root.y);
   await expect(page.locator('#auto-layout')).toHaveClass(/active/);
 });
 
 test('new child placement follows the active layout direction', async ({ page }) => {
-  const positions=async () => page.evaluate(() => { const data=JSON.parse(localStorage.getItem('mindflow-map')), root=data.nodes.find(n=>n.id==='root'), added=data.nodes.find(n=>n.text==='新しいノード'); return {root,added}; });
+  const positions=async () => page.evaluate(() => {const root=document.querySelector('[data-id="root"]'),added=[...document.querySelectorAll('.node')].find(el=>el.textContent.includes('新しいノード'));return {root:{x:parseFloat(root.style.left),y:parseFloat(root.style.top)},added:{x:parseFloat(added.style.left),y:parseFloat(added.style.top)}};});
   await page.locator('#horizontal-layout').click();
   await page.locator('.node.root').click();
   await page.keyboard.press('Tab');

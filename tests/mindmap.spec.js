@@ -75,7 +75,7 @@ test('opening a map updates the visible title from the JSON file', async ({ page
     mimeType:'application/json',
     buffer:Buffer.from(JSON.stringify({title:'プロジェクト計画',nodes:[{id:'root',text:'計画',x:100,y:100,parent:null}]}))
   });
-  await expect(page.locator('#map-title')).toHaveValue('プロジェクト計画');
+  await expect(page.locator('#map-title')).toHaveValue('project-map');
   await expect(page.locator('.node.root')).toHaveText('計画');
   await expect(page.locator('#save-status')).toHaveText('開きました: project-map.json');
   await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
@@ -93,7 +93,7 @@ test('opening a map with the default title uses its filename as the title', asyn
 test('opening a file in Chrome mode sets the title and enables overwrite save', async ({ page }) => {
   await page.evaluate(() => {const content=JSON.stringify({title:'既存ファイル',nodes:[{id:'root',text:'既存ノード',x:100,y:100,parent:null}]});window.showOpenFilePicker=async()=>[{name:'existing.json',getFile:async()=>new File([content],'existing.json',{type:'application/json'}),createWritable:async()=>({write:async()=>{},close:async()=>{}})}];});
   await page.locator('#import-btn').click();
-  await expect(page.locator('#map-title')).toHaveValue('既存ファイル');
+  await expect(page.locator('#map-title')).toHaveValue('existing');
   await expect(page.locator('#overwrite-btn')).toBeEnabled();
   await expect(page.locator('.node.root')).toHaveText('既存ノード');
 });
@@ -107,7 +107,7 @@ test('open, add a node, and overwrite save updates the opened file', async ({ pa
   await page.locator('#overwrite-btn').click();
   await expect.poll(()=>page.evaluate(()=>window.__openedFileWrites.length)).toBe(1);
   const saved=await page.evaluate(()=>JSON.parse(window.__openedFileWrites[0]));
-  expect(saved.title).toBe('作業中のマップ');
+  expect(saved.title).toBeUndefined();
   expect(saved.nodes).toHaveLength(2);
   expect(saved.nodes.some(node=>node.text==='新しいノード')).toBeTruthy();
   await expect(page.locator('#save-status')).toHaveText(/保存済み/);

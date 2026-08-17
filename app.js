@@ -2,14 +2,14 @@ const $ = s => document.querySelector(s);
 const canvas = $('#canvas'), layer = $('#node-layer'), svg = $('#connections');
 let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree', hasUnsavedChanges = false, currentFileHandle = null;
 let undoStack = [], redoStack = [];
-const starter = () => ({ title:'アイデアを育てよう', nodes:[
+const starter = () => ({ nodes:[
   {id:'root',text:'新しいアイデア',x:520,y:310,parent:null,color:'root'},
   {id:'a',text:'やりたいこと',x:260,y:165,parent:'root'}, {id:'b',text:'調べること',x:795,y:170,parent:'root'},
   {id:'c',text:'次のアクション',x:780,y:455,parent:'root'}, {id:'d',text:'アイデアをメモ',x:80,y:75,parent:'a'},
   {id:'e',text:'優先順位を決める',x:65,y:245,parent:'a'}, {id:'f',text:'参考資料',x:1065,y:90,parent:'b'}
 ]});
 map = starter();
-$('#map-title').value = map.title;
+$('#map-title').value = '無題のマップ';
 function get(id){ return map.nodes.find(n=>n.id===id); }
 function hexToRgb(hex){const value=hex.replace('#','');return [parseInt(value.slice(0,2),16),parseInt(value.slice(2,4),16),parseInt(value.slice(4,6),16)];}
 function mixWithWhite(hex,amount=.84){const rgb=hexToRgb(hex).map(value=>Math.round(255-(255-value)*(1-amount)));return `rgb(${rgb.join(', ')})`;}
@@ -20,13 +20,14 @@ function updateSaveStatus(text,dirty=hasUnsavedChanges){const status=$('#save-st
 function markDirty(){hasUnsavedChanges=true;updateSaveStatus('未保存');}
 function markSaved(){hasUnsavedChanges=false;const time=new Intl.DateTimeFormat('ja-JP',{hour:'2-digit',minute:'2-digit'}).format(new Date());updateSaveStatus(`保存済み ${time}`);}
 function markOpened(filename){hasUnsavedChanges=false;updateSaveStatus(`開きました: ${filename}`,false);}
-function persist(){ map.title=$('#map-title').value.trim()||'無題のマップ'; markDirty(); }
-function mapJson(){map.title=$('#map-title').value.trim()||'無題のマップ';return JSON.stringify(map,null,2);}
+function mapName(){return $('#map-title').value.trim()||'無題のマップ';}
+function persist(){ markDirty(); }
+function mapJson(){const data=copyMap();delete data.title;return JSON.stringify(data,null,2);}
 function updateOverwriteButton(){$('#overwrite-btn').disabled=!currentFileHandle;}
-function downloadJson(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([mapJson()],{type:'application/json'}));a.download=(map.title||'mindmap')+'.json';a.click();URL.revokeObjectURL(a.href);markSaved();toast('マップを保存しました');}
+function downloadJson(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([mapJson()],{type:'application/json'}));a.download=mapName()+'.json';a.click();URL.revokeObjectURL(a.href);markSaved();toast('マップを保存しました');}
 async function saveAs(){
   if(!window.showSaveFilePicker){downloadJson();return;}
-  try{currentFileHandle=await window.showSaveFilePicker({suggestedName:(map.title||'mindmap')+'.json',types:[{description:'Mindflow map',accept:{'application/json':['.json']}}]});updateOverwriteButton();await saveOverwrite();}catch(error){if(error.name!=='AbortError')toast('保存できませんでした');}
+  try{currentFileHandle=await window.showSaveFilePicker({suggestedName:mapName()+'.json',types:[{description:'Mindflow map',accept:{'application/json':['.json']}}]});$('#map-title').value=currentFileHandle.name.replace(/\.json$/i,'');updateOverwriteButton();await saveOverwrite();}catch(error){if(error.name!=='AbortError')toast('保存できませんでした');}
 }
 async function saveOverwrite(){
   if(!currentFileHandle){await saveAs();return;}
@@ -43,7 +44,6 @@ function recordChange(before){
 function restore(snapshot){
   map=copyMap(snapshot);
   selectedId=map.nodes.some(n=>n.id===selectedId) ? selectedId : 'root';
-  $('#map-title').value=map.title;
   persist();
   draw();
 }
@@ -88,11 +88,11 @@ function createPngDataUrl(){
   return out.toDataURL('image/png');
 }
 function exportPng(){
-  const a=document.createElement('a');a.href=createPngDataUrl();a.download=(map.title||'mindmap')+'.png';a.click();toast('PNGを書き出しました');
+  const a=document.createElement('a');a.href=createPngDataUrl();a.download=mapName()+'.png';a.click();toast('PNGを書き出しました');
 }
 function exportPdf(){
   const pngWindow=window.open('','_blank');if(!pngWindow){toast('ポップアップを許可してください');return;}
-  pngWindow.document.write(`<title>${map.title}</title><style>body{margin:0;text-align:center}img{max-width:100%;height:auto}</style><img src="${createPngDataUrl()}"><script>onload=()=>print()<\/script>`);pngWindow.document.close();
+  pngWindow.document.write(`<title>${mapName()}</title><style>body{margin:0;text-align:center}img{max-width:100%;height:auto}</style><img src="${createPngDataUrl()}"><script>onload=()=>print()<\/script>`);pngWindow.document.close();
 }
 function draw(){
   layer.innerHTML=''; svg.innerHTML='';
@@ -201,8 +201,8 @@ $('#auto-layout').onclick=()=>autoLayout('tree');$('#horizontal-layout').onclick
 $('#export-png-btn').onclick=exportPng;$('#export-pdf-btn').onclick=exportPdf;
 $('#color-picker').onclick=e=>{if(!e.target.matches('button[data-color]')||!get(selectedId))return;const before=copyMap();get(selectedId).color=e.target.dataset.color||undefined;persist();recordChange(before);draw();select(selectedId);};$('#node-icon').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).icon=e.target.value;persist();recordChange(before);draw();select(selectedId);};$('#node-note').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).note=e.target.value;persist();recordChange(before);draw();select(selectedId);};
 $('#node-search').oninput=searchNodes;
-$('#map-title').addEventListener('focus',e=>e.target.dataset.before=JSON.stringify(copyMap()));$('#map-title').addEventListener('change',e=>{const before=JSON.parse(e.target.dataset.before||JSON.stringify(copyMap()));persist();recordChange(before);});$('#new-btn').onclick=()=>{if(confirm('現在のマップを新しくしますか？')){const before=copyMap();map=starter();selectedId=undefined;scale=1;pan={x:0,y:0};persist();recordChange(before);draw();}};
-function loadMapFile(file,handle=null){const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!Array.isArray(v.nodes))throw 0;const before=copyMap();map=v;const filename=file.name.replace(/\.json$/i,'');const importedTitle=map.title?.trim();const isDefaultTitle=['アイデアを育てよう','アイディアを育てよう'].includes(importedTitle);$('#map-title').value=!importedTitle||isDefaultTitle?filename||'無題のマップ':importedTitle;currentFileHandle=handle;updateOverwriteButton();selectedId=undefined;recordChange(before);draw();markOpened(file.name);toast('マップを開きました');}catch{toast('有効なマップファイルではありません');}};r.readAsText(file);}
+$('#new-btn').onclick=()=>{if(confirm('現在のマップを新しくしますか？')){const before=copyMap();map=starter();$('#map-title').value='無題のマップ';currentFileHandle=null;updateOverwriteButton();selectedId=undefined;scale=1;pan={x:0,y:0};persist();recordChange(before);draw();}};
+function loadMapFile(file,handle=null){const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!Array.isArray(v.nodes))throw 0;const before=copyMap();map=v;$('#map-title').value=file.name.replace(/\.json$/i,'')||'無題のマップ';delete map.title;currentFileHandle=handle;updateOverwriteButton();selectedId=undefined;recordChange(before);draw();markOpened(file.name);toast('マップを開きました');}catch{toast('有効なマップファイルではありません');}};r.readAsText(file);}
 async function openMap(){if(!window.showOpenFilePicker){$('#file-input').click();return;}try{const [handle]=await window.showOpenFilePicker({types:[{description:'Mindflow map',accept:{'application/json':['.json']}}]});loadMapFile(await handle.getFile(),handle);}catch(error){if(error.name!=='AbortError')toast('ファイルを開けませんでした');}}
 $('#export-btn').onclick=saveAs;$('#overwrite-btn').onclick=saveOverwrite;$('#import-btn').onclick=openMap;$('#file-input').onchange=e=>{const f=e.target.files[0];if(f)loadMapFile(f);};
 document.addEventListener('keydown',e=>{

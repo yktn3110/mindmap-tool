@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const canvas = $('#canvas'), layer = $('#node-layer'), svg = $('#connections');
-let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree', hasUnsavedChanges = false, currentFileHandle = null;
+let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree', hasUnsavedChanges = false, currentFileHandle = null, cutNodeId = null;
 let undoStack = [], redoStack = [];
 const starter = () => ({ nodes:[
   {id:'root',text:'新しいアイデア',x:520,y:310,parent:null,color:'root'},
@@ -99,7 +99,7 @@ function draw(){
   layer.style.transform=`translate(${pan.x}px,${pan.y}px) scale(${scale})`;
   const visible=visibleNodes();
   visible.forEach(n=>{
-    const el=document.createElement('div'); el.className='node'+(n.id==='root'?' root':'')+(n.id===selectedId?' selected':''); el.dataset.id=n.id; el.style.left=n.x+'px'; el.style.top=n.y+'px'; if(n.color){el.style.setProperty('--node-color',n.color);el.style.setProperty('--node-background',mixWithWhite(n.color));el.style.setProperty('--node-border',n.color);el.style.setProperty('--node-text',n.color);}
+    const el=document.createElement('div'); el.className='node'+(n.id==='root'?' root':'')+(n.id===selectedId?' selected':'')+(n.id===cutNodeId?' cut':''); el.dataset.id=n.id; el.style.left=n.x+'px'; el.style.top=n.y+'px'; if(n.color){el.style.setProperty('--node-color',n.color);el.style.setProperty('--node-background',mixWithWhite(n.color));el.style.setProperty('--node-border',n.color);el.style.setProperty('--node-text',n.color);}
     const icon=document.createElement('span');icon.className='node-icon';icon.textContent=n.icon ? n.icon+' ' : ''; const label=document.createElement('span');label.className='node-label';label.textContent=n.text;label.addEventListener('mousedown',e=>{if(label.isContentEditable)e.stopPropagation();});label.addEventListener('click',e=>{if(label.isContentEditable)e.stopPropagation();});el.append(icon,label);if(n.note){const noteMark=document.createElement('span');noteMark.className='note-indicator';noteMark.setAttribute('aria-label','補足メモあり');noteMark.title='補足メモあり';noteMark.textContent='▤';el.append(noteMark);}
     if(childrenOf(n.id).length){const toggle=document.createElement('button');toggle.className='collapse-toggle';toggle.type='button';toggle.dataset.id=n.id;toggle.setAttribute('aria-label',n.collapsed?'子ノードを展開':'子ノードを折り畳む');toggle.textContent=n.collapsed?'＋':'−';toggle.addEventListener('mousedown',e=>e.stopPropagation());toggle.addEventListener('click',e=>{e.stopPropagation();toggleCollapse(n.id);});el.append(toggle);}
     el.addEventListener('dblclick',e=>editNode(n.id,e.currentTarget.querySelector('.node-label'))); el.addEventListener('mousedown',startNodeDrag); el.addEventListener('click',()=>select(n.id)); layer.append(el);
@@ -162,6 +162,8 @@ function editNode(id,el,selectAll=true){
 }
 function addNode(sibling=false){ const before=copyMap(); const base=get(selectedId)||get('root'); const parent=sibling ? get(base.parent)||base : base; const siblings=map.nodes.filter(n=>n.parent===parent.id); const index=siblings.length; const node={id:crypto.randomUUID(),text:'新しいノード',parent:parent.id,x:currentLayout==='horizontal'?parent.x+210:parent.x+index*145,y:currentLayout==='horizontal'?parent.y+index*92:parent.y+125}; map.nodes.push(node); selectedId=node.id; persist();recordChange(before);draw(); editNode(node.id,layer.querySelector(`[data-id="${node.id}"] .node-label`)); }
 function remove(){ const n=get(selectedId); if(!n||!n.parent){toast('中心ノードは削除できません');return;} const before=copyMap(); const ids=new Set([n.id]); let changed=true; while(changed){changed=false;map.nodes.forEach(x=>{if(ids.has(x.parent)&&!ids.has(x.id)){ids.add(x.id);changed=true;}})} map.nodes=map.nodes.filter(x=>!ids.has(x.id));selectedId=n.parent;persist();recordChange(before);draw(); }
+function cutNode(){const node=get(selectedId);if(!node||!node.parent){toast('中心ノードは切り取れません');return;}cutNodeId=node.id;$('#paste-node').disabled=false;draw();}
+function pasteNode(){const node=get(cutNodeId),target=get(selectedId);if(!node||!target)return;const descendants=new Set([node.id]);let changed=true;while(changed){changed=false;map.nodes.forEach(item=>{if(descendants.has(item.parent)&&!descendants.has(item.id)){descendants.add(item.id);changed=true;}})}if(descendants.has(target.id)){toast('子ノードには貼り付けできません');return;}const before=copyMap();node.parent=target.id;cutNodeId=null;$('#paste-node').disabled=true;persist();recordChange(before);draw();select(node.id);toast('ノードを貼り付けました');}
 function startNodeDrag(e){
   const n=get(e.currentTarget.dataset.id);
   const label=e.target.closest('.node-label');
@@ -197,6 +199,7 @@ window.addEventListener('mouseup',()=>{
 canvas.addEventListener('wheel',e=>{e.preventDefault();scale=Math.max(.45,Math.min(1.8,scale+(e.deltaY<0?.08:-.08)));draw();},{passive:false});
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800);}
 $('#add-child').onclick=()=>addNode();$('#add-sibling').onclick=()=>addNode(true);$('#delete-node').onclick=remove;$('#undo-btn').onclick=undo;$('#redo-btn').onclick=redo;$('#zoom-in').onclick=()=>{scale=Math.min(1.8,scale+.1);draw()};$('#zoom-out').onclick=()=>{scale=Math.max(.45,scale-.1);draw()};$('#fit-view').onclick=fitView;
+$('#cut-node').onclick=cutNode;$('#paste-node').onclick=pasteNode;
 $('#auto-layout').onclick=()=>autoLayout('tree');$('#horizontal-layout').onclick=()=>autoLayout('horizontal');
 $('#export-png-btn').onclick=exportPng;$('#export-pdf-btn').onclick=exportPdf;
 $('#color-picker').onclick=e=>{if(!e.target.matches('button[data-color]')||!get(selectedId))return;const before=copyMap();get(selectedId).color=e.target.dataset.color||undefined;persist();recordChange(before);draw();select(selectedId);};$('#node-icon').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).icon=e.target.value;persist();recordChange(before);draw();select(selectedId);};$('#node-note').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).note=e.target.value;persist();recordChange(before);draw();select(selectedId);};

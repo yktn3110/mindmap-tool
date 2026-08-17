@@ -160,6 +160,18 @@ test('undo restores a deleted node and redo deletes it again', async ({ page }) 
   await expect(page.locator('.node').filter({ hasText: 'やりたいこと' })).toHaveCount(0);
 });
 
+test('cut and paste reattaches a node under a different parent', async ({ page }) => {
+  await page.locator('.node').filter({hasText:'アイデアをメモ'}).click();
+  await page.locator('#cut-node').click();
+  await expect(page.locator('#paste-node')).toBeEnabled();
+  await page.locator('.node').filter({hasText:'調べること'}).click();
+  await page.locator('#paste-node').click();
+  await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'map.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
+  await page.locator('#export-btn').click();
+  const saved=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[0]));
+  expect(saved.nodes.find(node=>node.text==='アイデアをメモ').parent).toBe('b');
+});
+
 test('double-clicking a node enables text editing and persists it', async ({ page }) => {
   const node = page.locator('.node').filter({ hasText: 'やりたいこと' });
   await node.dblclick();

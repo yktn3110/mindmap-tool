@@ -13,7 +13,7 @@ $('#map-title').value = '無題のマップ';
 function get(id){ return map.nodes.find(n=>n.id===id); }
 function hexToRgb(hex){const value=hex.replace('#','');return [parseInt(value.slice(0,2),16),parseInt(value.slice(2,4),16),parseInt(value.slice(4,6),16)];}
 function mixWithWhite(hex,amount=.84){const rgb=hexToRgb(hex).map(value=>Math.round(255-(255-value)*(1-amount)));return `rgb(${rgb.join(', ')})`;}
-function childrenOf(id){ return map.nodes.filter(n=>n.parent===id); }
+function childrenOf(id){ return map.nodes.filter(n=>n.parent===id).sort((a,b)=>(a.order??map.nodes.indexOf(a))-(b.order??map.nodes.indexOf(b))); }
 function visibleNodes(){ const output=[]; const visit=node=>{output.push(node);if(!node.collapsed)childrenOf(node.id).forEach(visit);}; const root=map.nodes.find(n=>!n.parent);if(root)visit(root);return output; }
 function copyMap(value=map){ return JSON.parse(JSON.stringify(value)); }
 function updateSaveStatus(text,dirty=hasUnsavedChanges){const status=$('#save-status');status.textContent=text;status.classList.toggle('dirty',dirty);status.title=dirty?'変更があります。保存してから閉じてください。':'保存が必要な変更はありません。';}
@@ -64,11 +64,15 @@ function redo(){
   toast('やり直しました');
 }
 function setLayoutButton(type){ $('#auto-layout').classList.toggle('active',type==='tree'); $('#horizontal-layout').classList.toggle('active',type==='horizontal'); }
-function autoLayout(type='tree'){
-  const before=copyMap(), leaves=[];
-  const children=id=>map.nodes.filter(n=>n.parent===id);
+function layoutMap(type){
+  const leaves=[];
+  const children=childrenOf;
   const place=(node,depth)=>{ const kids=children(node.id); if(!kids.length){ if(type==='tree')node.x=90+leaves.length*190; else node.y=90+leaves.length*105; leaves.push(node); } else { kids.forEach(k=>place(k,depth+1)); if(type==='tree')node.x=kids.reduce((sum,k)=>sum+k.x,0)/kids.length; else node.y=kids.reduce((sum,k)=>sum+k.y,0)/kids.length; } if(type==='tree')node.y=90+depth*125; else node.x=90+depth*210; };
-  const root=map.nodes.find(n=>!n.parent); if(!root)return; place(root,0); currentLayout=type; persist(); recordChange(before); draw(); setLayoutButton(type); toast(type==='tree'?'ツリーに整列しました':'横展開に整列しました');
+  const root=map.nodes.find(n=>!n.parent); if(root)place(root,0);
+}
+function autoLayout(type='tree'){
+  const before=copyMap();
+  layoutMap(type); currentLayout=type; persist(); recordChange(before); draw(); setLayoutButton(type); toast(type==='tree'?'ツリーに整列しました':'横展開に整列しました');
 }
 function mapBounds(){
   const nodes=visibleNodes(), widths=nodes.map(n=>(layer.querySelector(`[data-id="${n.id}"]`)?.offsetWidth||130)), heights=nodes.map(n=>(layer.querySelector(`[data-id="${n.id}"]`)?.offsetHeight||46));
@@ -115,6 +119,7 @@ function select(id){
   selectedId=id;
   layer.querySelectorAll('.node').forEach(el=>el.classList.toggle('selected',el.dataset.id===id));
   const node=get(id), enabled=!!node; $('#node-icon').disabled=!enabled;$('#node-note').disabled=!enabled;$('#node-icon').value=node?.icon||'';$('#node-note').value=node?.note||'';$('#color-picker').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.color===node?.color));
+  const siblings=node?.parent ? childrenOf(node.parent) : [], index=siblings.indexOf(node);$('#move-node-up').disabled=index<=0;$('#move-node-down').disabled=index<0||index===siblings.length-1;
   const preview=$('#note-preview');preview.hidden=!node?.note;if(node?.note){$('#note-preview-node').textContent=`${node.icon?node.icon+' ':''}${node.text}`;$('#note-preview-text').textContent=node.note;}
 }
 function focusNode(id){
@@ -166,10 +171,19 @@ function editNode(id,el,selectAll=true){
     }
   });
 }
-function addNode(sibling=false){ const before=copyMap(); const base=get(selectedId)||get('root'); const parent=sibling ? get(base.parent)||base : base; const siblings=map.nodes.filter(n=>n.parent===parent.id); const index=siblings.length; const node={id:crypto.randomUUID(),text:'新しいノード',parent:parent.id,x:currentLayout==='horizontal'?parent.x+210:parent.x+index*145,y:currentLayout==='horizontal'?parent.y+index*92:parent.y+125}; map.nodes.push(node); selectedId=node.id; persist();recordChange(before);draw(); editNode(node.id,layer.querySelector(`[data-id="${node.id}"] .node-label`)); }
+function addNode(sibling=false){ const before=copyMap(); const base=get(selectedId)||get('root'); const parent=sibling ? get(base.parent)||base : base; const siblings=childrenOf(parent.id); const index=siblings.length; const node={id:crypto.randomUUID(),text:'新しいノード',parent:parent.id,order:index,x:currentLayout==='horizontal'?parent.x+210:parent.x+index*145,y:currentLayout==='horizontal'?parent.y+index*92:parent.y+125}; map.nodes.push(node); selectedId=node.id; persist();recordChange(before);draw(); editNode(node.id,layer.querySelector(`[data-id="${node.id}"] .node-label`)); }
 function remove(){ const n=get(selectedId); if(!n||!n.parent){toast('中心ノードは削除できません');return;} const before=copyMap(); const ids=new Set([n.id]); let changed=true; while(changed){changed=false;map.nodes.forEach(x=>{if(ids.has(x.parent)&&!ids.has(x.id)){ids.add(x.id);changed=true;}})} map.nodes=map.nodes.filter(x=>!ids.has(x.id));selectedId=n.parent;persist();recordChange(before);draw(); }
 function cutNode(){const node=get(selectedId);if(!node||!node.parent){toast('中心ノードは切り取れません');return;}cutNodeId=node.id;$('#paste-node').disabled=false;draw();}
-function pasteNode(){const node=get(cutNodeId),target=get(selectedId);if(!node||!target)return;const descendants=new Set([node.id]);let changed=true;while(changed){changed=false;map.nodes.forEach(item=>{if(descendants.has(item.parent)&&!descendants.has(item.id)){descendants.add(item.id);changed=true;}})}if(descendants.has(target.id)){toast('子ノードには貼り付けできません');return;}const before=copyMap();node.parent=target.id;cutNodeId=null;$('#paste-node').disabled=true;persist();recordChange(before);draw();select(node.id);toast('ノードを貼り付けました');}
+function pasteNode(){const node=get(cutNodeId),target=get(selectedId);if(!node||!target)return;const descendants=new Set([node.id]);let changed=true;while(changed){changed=false;map.nodes.forEach(item=>{if(descendants.has(item.parent)&&!descendants.has(item.id)){descendants.add(item.id);changed=true;}})}if(descendants.has(target.id)){toast('子ノードには貼り付けできません');return;}const before=copyMap(),order=childrenOf(target.id).length;node.parent=target.id;node.order=order;cutNodeId=null;$('#paste-node').disabled=true;persist();recordChange(before);draw();select(node.id);toast('ノードを貼り付けました');}
+function moveSibling(direction){
+  const node=get(selectedId); if(!node?.parent)return;
+  const siblings=childrenOf(node.parent),index=siblings.indexOf(node),target=index+direction;
+  if(target<0||target>=siblings.length)return;
+  const before=copyMap();
+  [siblings[index],siblings[target]]=[siblings[target],siblings[index]];
+  siblings.forEach((item,position)=>item.order=position);
+  layoutMap(currentLayout);persist();recordChange(before);draw();select(node.id);toast('兄弟ノードの順番を変更しました');
+}
 function startNodeDrag(e){
   const n=get(e.currentTarget.dataset.id);
   const label=e.target.closest('.node-label');
@@ -204,7 +218,7 @@ window.addEventListener('mouseup',()=>{
 });
 canvas.addEventListener('wheel',e=>{e.preventDefault();scale=Math.max(.45,Math.min(1.8,scale+(e.deltaY<0?.08:-.08)));draw();},{passive:false});
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800);}
-$('#add-child').onclick=()=>addNode();$('#add-sibling').onclick=()=>addNode(true);$('#delete-node').onclick=remove;$('#undo-btn').onclick=undo;$('#redo-btn').onclick=redo;$('#zoom-in').onclick=()=>{scale=Math.min(1.8,scale+.1);draw()};$('#zoom-out').onclick=()=>{scale=Math.max(.45,scale-.1);draw()};$('#fit-view').onclick=fitView;
+$('#add-child').onclick=()=>addNode();$('#add-sibling').onclick=()=>addNode(true);$('#delete-node').onclick=remove;$('#move-node-up').onclick=()=>moveSibling(-1);$('#move-node-down').onclick=()=>moveSibling(1);$('#undo-btn').onclick=undo;$('#redo-btn').onclick=redo;$('#zoom-in').onclick=()=>{scale=Math.min(1.8,scale+.1);draw()};$('#zoom-out').onclick=()=>{scale=Math.max(.45,scale-.1);draw()};$('#fit-view').onclick=fitView;
 $('#cut-node').onclick=cutNode;$('#paste-node').onclick=pasteNode;
 $('#auto-layout').onclick=()=>autoLayout('tree');$('#horizontal-layout').onclick=()=>autoLayout('horizontal');
 $('#export-png-btn').onclick=exportPng;$('#export-pdf-btn').onclick=exportPdf;

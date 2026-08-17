@@ -300,6 +300,32 @@ test('horizontal layout places children to the right of their parent and switche
   await expect(page.locator('#auto-layout')).toHaveClass(/active/);
 });
 
+test('siblings can be reordered, saved, and restored with undo', async ({ page }) => {
+  const first=page.locator('.node').filter({hasText:'やりたいこと'});
+  const target=page.locator('.node').filter({hasText:'調べること'});
+  await target.click();
+  await expect(page.locator('#move-node-up')).toBeEnabled();
+  await expect(page.locator('#move-node-down')).toBeEnabled();
+  await page.locator('#move-node-up').click();
+  const positions=await page.evaluate(() => {
+    const position=text=>{const node=[...document.querySelectorAll('.node')].find(item=>item.textContent.includes(text));return Number.parseFloat(node.style.left);};
+    return {first:position('やりたいこと'),target:position('調べること')};
+  });
+  expect(positions.target).toBeLessThan(positions.first);
+  await expect(page.locator('#move-node-up')).toBeDisabled();
+  await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'order.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
+  await page.locator('#export-btn').click();
+  const saved=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[0]));
+  expect(saved.nodes.find(node=>node.id==='b').order).toBe(0);
+  expect(saved.nodes.find(node=>node.id==='a').order).toBe(1);
+  await page.locator('#undo-btn').click();
+  const restored=await page.evaluate(() => {
+    const position=text=>{const node=[...document.querySelectorAll('.node')].find(item=>item.textContent.includes(text));return Number.parseFloat(node.style.left);};
+    return {first:position('やりたいこと'),target:position('調べること')};
+  });
+  expect(restored.first).toBeLessThan(restored.target);
+});
+
 test('new child placement follows the active layout direction', async ({ page }) => {
   const positions=async () => page.evaluate(() => {const root=document.querySelector('[data-id="root"]'),added=[...document.querySelectorAll('.node')].find(el=>el.textContent.includes('新しいノード'));return {root:{x:parseFloat(root.style.left),y:parseFloat(root.style.top)},added:{x:parseFloat(added.style.left),y:parseFloat(added.style.top)}};});
   await page.locator('#horizontal-layout').click();

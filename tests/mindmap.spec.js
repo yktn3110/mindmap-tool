@@ -53,6 +53,19 @@ test('save as enables overwriting the same JSON file', async ({ page }) => {
   await expect.poll(()=>page.evaluate(()=>JSON.parse(window.__mindflowWrites[1]).nodes.some(node=>node.text==='新しいノード'))).toBeTruthy();
 });
 
+test('auto save writes unsaved changes every three minutes when enabled', async ({ page }) => {
+  await page.evaluate(() => {window.__mindflowWrites=[];window.__autoSaveCallback=null;window.showSaveFilePicker=async()=>({name:'map.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});window.setInterval=(callback,delay)=>{window.__autoSaveCallback=callback;window.__autoSaveDelay=delay;return 1;};});
+  await page.locator('#export-btn').click();
+  await page.locator('.node.root').click();
+  await page.keyboard.press('Tab');
+  await page.locator('#auto-save-btn').click();
+  await expect(page.locator('#auto-save-btn')).toHaveText('自動保存 ON');
+  expect(await page.evaluate(()=>window.__autoSaveDelay)).toBe(180000);
+  await page.evaluate(()=>window.__autoSaveCallback());
+  await expect.poll(()=>page.evaluate(()=>window.__mindflowWrites.length)).toBe(2);
+  await expect(page.locator('#save-status')).toHaveText(/保存済み/);
+});
+
 test('closing a page with unsaved changes shows a browser warning', async ({ page }) => {
   await page.locator('.node.root').click();
   await page.keyboard.press('Tab');

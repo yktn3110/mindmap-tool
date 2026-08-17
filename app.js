@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const canvas = $('#canvas'), layer = $('#node-layer'), svg = $('#connections');
-let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree', hasUnsavedChanges = false, currentFileHandle = null, cutNodeId = null;
+let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree', hasUnsavedChanges = false, currentFileHandle = null, cutNodeId = null, autoSaveTimer = null;
 let undoStack = [], redoStack = [];
 const starter = () => ({ nodes:[
   {id:'root',text:'新しいアイデア',x:520,y:310,parent:null,color:'root'},
@@ -33,6 +33,8 @@ async function saveOverwrite(){
   if(!currentFileHandle){await saveAs();return;}
   try{const writable=await currentFileHandle.createWritable();await writable.write(mapJson());await writable.close();markSaved();toast('上書き保存しました');}catch(error){toast('保存できませんでした');}
 }
+async function autoSaveIfNeeded(){if(hasUnsavedChanges&&currentFileHandle)await saveOverwrite();}
+function toggleAutoSave(){if(autoSaveTimer){clearInterval(autoSaveTimer);autoSaveTimer=null;$('#auto-save-btn').textContent='自動保存 OFF';$('#auto-save-btn').setAttribute('aria-pressed','false');toast('自動保存を停止しました');return;}if(!currentFileHandle){toast('先に名前を付けて保存、またはファイルを開いてください');return;}autoSaveTimer=setInterval(autoSaveIfNeeded,3*60*1000);$('#auto-save-btn').textContent='自動保存 ON';$('#auto-save-btn').setAttribute('aria-pressed','true');toast('3分ごとの自動保存を開始しました');}
 function updateHistoryButtons(){ $('#undo-btn').disabled=!undoStack.length; $('#redo-btn').disabled=!redoStack.length; }
 function recordChange(before){
   if(JSON.stringify(before)===JSON.stringify(map)) return;
@@ -208,6 +210,7 @@ $('#new-btn').onclick=()=>{if(confirm('現在のマップを新しくします�
 function loadMapFile(file,handle=null){const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!Array.isArray(v.nodes))throw 0;const before=copyMap();map=v;$('#map-title').value=file.name.replace(/\.json$/i,'')||'無題のマップ';delete map.title;currentFileHandle=handle;updateOverwriteButton();selectedId=undefined;recordChange(before);draw();markOpened(file.name);toast('マップを開きました');}catch{toast('有効なマップファイルではありません');}};r.readAsText(file);}
 async function openMap(){if(!window.showOpenFilePicker){$('#file-input').click();return;}try{const [handle]=await window.showOpenFilePicker({types:[{description:'Mindflow map',accept:{'application/json':['.json']}}]});loadMapFile(await handle.getFile(),handle);}catch(error){if(error.name!=='AbortError')toast('ファイルを開けませんでした');}}
 $('#export-btn').onclick=saveAs;$('#overwrite-btn').onclick=saveOverwrite;$('#import-btn').onclick=openMap;$('#file-input').onchange=e=>{const f=e.target.files[0];if(f)loadMapFile(f);};
+$('#auto-save-btn').onclick=toggleAutoSave;
 document.addEventListener('keydown',e=>{
   if(document.activeElement.isContentEditable || document.activeElement.matches('input, textarea, select')) return;
   if((e.ctrlKey||e.metaKey) && !e.altKey && e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); }

@@ -147,14 +147,18 @@ function editNode(id,el,selectAll=true){
   }
   const finish=()=>{
     const text=el.textContent.trim();
-    if(text) get(id).text=text;
+    if(text){
+      get(id).text=text;
+      el.textContent=text;
+    }
     el.contentEditable='false';
     persist();
     recordChange(before);
   };
   el.addEventListener('blur',finish,{once:true});
   el.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){ e.preventDefault(); el.blur(); }
+    if(e.key==='Enter'&&e.shiftKey){ e.preventDefault(); document.execCommand('insertText',false,'\n'); }
+    else if(e.key==='Enter'){ e.preventDefault(); el.blur(); }
     if(e.key==='Tab'){
       e.preventDefault();
       el.blur();

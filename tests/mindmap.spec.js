@@ -197,6 +197,17 @@ test('double-clicking a node enables text editing and persists it', async ({ pag
   await expect(page.locator('.node').filter({ hasText: '企画すること' })).toHaveCount(1);
 });
 
+test('Shift+Enter adds a line break inside an edited node', async ({ page }) => {
+  const node=page.locator('.node').filter({hasText:'やりたいこと'});
+  await node.dblclick();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Shift+Enter');
+  await page.keyboard.type('補足');
+  await page.keyboard.press('Enter');
+  await expect.poll(()=>node.locator('.node-label').textContent()).toBe('やりたいこと\n補足');
+  await expect(node.locator('.node-label')).toHaveCSS('white-space','pre-wrap');
+});
+
 test('double-clicking a selected node selects all of its text for editing', async ({ page }) => {
   const node = page.locator('.node').filter({ hasText: 'やりたいこと' });
   await node.click();

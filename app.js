@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const canvas = $('#canvas'), layer = $('#node-layer'), svg = $('#connections');
-let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree';
+let map, selectedId, scale = 1, pan = {x:0,y:0}, drag = null, currentLayout = 'tree', hasUnsavedChanges = false;
 let undoStack = [], redoStack = [];
 const starter = () => ({ title:'アイデアを育てよう', nodes:[
   {id:'root',text:'新しいアイデア',x:520,y:310,parent:null,color:'root'},
@@ -16,7 +16,10 @@ function mixWithWhite(hex,amount=.84){const rgb=hexToRgb(hex).map(value=>Math.ro
 function childrenOf(id){ return map.nodes.filter(n=>n.parent===id); }
 function visibleNodes(){ const output=[]; const visit=node=>{output.push(node);if(!node.collapsed)childrenOf(node.id).forEach(visit);}; const root=map.nodes.find(n=>!n.parent);if(root)visit(root);return output; }
 function copyMap(value=map){ return JSON.parse(JSON.stringify(value)); }
-function persist(){ map.title=$('#map-title').value.trim()||'無題のマップ'; localStorage.setItem('mindflow-map',JSON.stringify(map)); $('#save-status').textContent='ローカルに保存済み'; }
+function updateSaveStatus(text,dirty=hasUnsavedChanges){const status=$('#save-status');status.textContent=text;status.classList.toggle('dirty',dirty);}
+function markDirty(){hasUnsavedChanges=true;updateSaveStatus('未保存の変更');}
+function markSaved(){hasUnsavedChanges=false;const time=new Intl.DateTimeFormat('ja-JP',{hour:'2-digit',minute:'2-digit'}).format(new Date());updateSaveStatus(`保存済み ${time}`);}
+function persist(){ map.title=$('#map-title').value.trim()||'無題のマップ'; localStorage.setItem('mindflow-map',JSON.stringify(map)); markDirty(); }
 function updateHistoryButtons(){ $('#undo-btn').disabled=!undoStack.length; $('#redo-btn').disabled=!redoStack.length; }
 function recordChange(before){
   if(JSON.stringify(before)===JSON.stringify(map)) return;
@@ -187,7 +190,7 @@ $('#export-png-btn').onclick=exportPng;$('#export-pdf-btn').onclick=exportPdf;
 $('#color-picker').onclick=e=>{if(!e.target.matches('button[data-color]')||!get(selectedId))return;const before=copyMap();get(selectedId).color=e.target.dataset.color||undefined;persist();recordChange(before);draw();select(selectedId);};$('#node-icon').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).icon=e.target.value;persist();recordChange(before);draw();select(selectedId);};$('#node-note').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).note=e.target.value;persist();recordChange(before);draw();select(selectedId);};
 $('#node-search').oninput=searchNodes;
 $('#map-title').addEventListener('focus',e=>e.target.dataset.before=JSON.stringify(copyMap()));$('#map-title').addEventListener('change',e=>{const before=JSON.parse(e.target.dataset.before||JSON.stringify(copyMap()));persist();recordChange(before);});$('#new-btn').onclick=()=>{if(confirm('現在のマップを新しくしますか？')){const before=copyMap();map=starter();selectedId=undefined;scale=1;pan={x:0,y:0};persist();recordChange(before);draw();}};
-$('#export-btn').onclick=()=>{persist();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(map,null,2)],{type:'application/json'}));a.download=(map.title||'mindmap')+'.json';a.click();URL.revokeObjectURL(a.href);toast('マップを書き出しました');};$('#import-btn').onclick=()=>$('#file-input').click();$('#file-input').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!Array.isArray(v.nodes))throw 0;const before=copyMap();map=v;selectedId=undefined;persist();recordChange(before);draw();toast('マップを読み込みました');}catch{toast('有効なマップファイルではありません');}};r.readAsText(f);};
+$('#export-btn').onclick=()=>{map.title=$('#map-title').value.trim()||'無題のマップ';const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(map,null,2)],{type:'application/json'}));a.download=(map.title||'mindmap')+'.json';a.click();URL.revokeObjectURL(a.href);localStorage.setItem('mindflow-map',JSON.stringify(map));markSaved();toast('マップを書き出しました');};$('#import-btn').onclick=()=>$('#file-input').click();$('#file-input').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const v=JSON.parse(r.result);if(!Array.isArray(v.nodes))throw 0;const before=copyMap();map=v;selectedId=undefined;persist();recordChange(before);draw();toast('マップを読み込みました');}catch{toast('有効なマップファイルではありません');}};r.readAsText(f);};
 document.addEventListener('keydown',e=>{
   if(document.activeElement.isContentEditable || document.activeElement.matches('input, textarea, select')) return;
   if((e.ctrlKey||e.metaKey) && !e.altKey && e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); }
@@ -196,5 +199,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Enter'){ e.preventDefault(); addNode(true); }
   else if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); remove(); }
 }, true);
+window.addEventListener('beforeunload',e=>{if(!hasUnsavedChanges)return;e.preventDefault();e.returnValue='';});
+updateSaveStatus('変更なし',false);
 updateHistoryButtons();
 draw();

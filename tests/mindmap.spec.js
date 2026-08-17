@@ -25,6 +25,29 @@ test('Tab adds a child node instead of moving browser focus', async ({ page }) =
   await expect(nodes.filter({ hasText: '新しいノード' })).toHaveCount(1);
 });
 
+test('save status changes after editing and JSON export', async ({ page }) => {
+  await expect(page.locator('#save-status')).toHaveText('変更なし');
+  await page.locator('.node.root').click();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#save-status')).toHaveText('未保存の変更');
+  await expect(page.locator('#save-status')).toHaveClass(/dirty/);
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#export-btn').click();
+  await downloadPromise;
+  await expect(page.locator('#save-status')).toHaveText(/保存済み/);
+  await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
+});
+
+test('closing a page with unsaved changes shows a browser warning', async ({ page }) => {
+  await page.locator('.node.root').click();
+  await page.keyboard.press('Tab');
+  const dialogPromise=page.waitForEvent('dialog');
+  await page.close({runBeforeUnload:true});
+  const dialog=await dialogPromise;
+  expect(dialog.type()).toBe('beforeunload');
+  await dialog.dismiss();
+});
+
 test('Tab adds a child while the node created by the previous Tab is being edited', async ({ page }) => {
   const nodes = page.locator('.node');
   await page.locator('.node.root').click();

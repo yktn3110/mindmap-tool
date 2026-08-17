@@ -16,8 +16,8 @@ function mixWithWhite(hex,amount=.84){const rgb=hexToRgb(hex).map(value=>Math.ro
 function childrenOf(id){ return map.nodes.filter(n=>n.parent===id); }
 function visibleNodes(){ const output=[]; const visit=node=>{output.push(node);if(!node.collapsed)childrenOf(node.id).forEach(visit);}; const root=map.nodes.find(n=>!n.parent);if(root)visit(root);return output; }
 function copyMap(value=map){ return JSON.parse(JSON.stringify(value)); }
-function updateSaveStatus(text,dirty=hasUnsavedChanges){const status=$('#save-status');status.textContent=text;status.classList.toggle('dirty',dirty);}
-function markDirty(){hasUnsavedChanges=true;updateSaveStatus('未保存の変更');}
+function updateSaveStatus(text,dirty=hasUnsavedChanges){const status=$('#save-status');status.textContent=text;status.classList.toggle('dirty',dirty);status.title=dirty?'変更があります。保存してから閉じてください。':'保存が必要な変更はありません。';}
+function markDirty(){hasUnsavedChanges=true;updateSaveStatus('未保存');}
 function markSaved(){hasUnsavedChanges=false;const time=new Intl.DateTimeFormat('ja-JP',{hour:'2-digit',minute:'2-digit'}).format(new Date());updateSaveStatus(`保存済み ${time}`);}
 function persist(){ map.title=$('#map-title').value.trim()||'無題のマップ'; markDirty(); }
 function updateHistoryButtons(){ $('#undo-btn').disabled=!undoStack.length; $('#redo-btn').disabled=!redoStack.length; }

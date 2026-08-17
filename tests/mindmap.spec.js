@@ -30,8 +30,10 @@ test('save status changes after editing and JSON export', async ({ page }) => {
   await expect(page.locator('#save-status')).toHaveText('変更なし');
   await page.locator('.node.root').click();
   await page.keyboard.press('Tab');
-  await expect(page.locator('#save-status')).toHaveText('未保存の変更');
+  await expect(page.locator('#save-status')).toHaveText('未保存');
   await expect(page.locator('#save-status')).toHaveClass(/dirty/);
+  await expect(page.locator('#export-btn')).toHaveText('保存');
+  await expect(page.locator('#import-btn')).toHaveText('開く');
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#export-btn').click();
   await downloadPromise;

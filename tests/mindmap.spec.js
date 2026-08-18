@@ -1,5 +1,8 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const { spawn } = require('node:child_process');
 const { createMindflowServer } = require('../server.js');
 
 let server;
@@ -24,6 +27,30 @@ test('Tab adds a child node instead of moving browser focus', async ({ page }) =
   await page.keyboard.press('Tab');
   await expect(nodes).toHaveCount(before + 1);
   await expect(nodes.filter({ hasText: '新しいノード' })).toHaveCount(1);
+});
+
+test('CLI opens a specified map when it starts', async ({ page }) => {
+  const tempDirectory=await fs.mkdtemp(path.join(os.tmpdir(),'mindflow-cli-'));
+  const mapPath=path.join(tempDirectory,'cli-map.json');
+  await fs.writeFile(mapPath,JSON.stringify({nodes:[{id:'root',text:'CLIで開いたマップ',x:100,y:100,parent:null}]}));
+  const cli=spawn(process.execPath,['cli.mjs',mapPath,'--no-open'],{cwd:path.resolve(__dirname,'..'),stdio:['ignore','pipe','pipe']});
+  try {
+    const url=await new Promise((resolve,reject)=>{
+      let output='',error='';
+      const timeout=setTimeout(()=>reject(new Error(`CLI did not start: ${error}`)),5000);
+      cli.stdout.on('data',chunk=>{output+=chunk;const match=output.match(/Mindflow: (http:\/\/[^\s]+)/);if(match){clearTimeout(timeout);resolve(match[1]);}});
+      cli.stderr.on('data',chunk=>{error+=chunk;});
+      cli.on('error',reject);
+    });
+    await page.goto(url);
+    await expect(page.locator('#map-title')).toHaveValue('cli-map');
+    await expect(page.locator('.node.root')).toHaveText('CLIで開いたマップ');
+    await expect(page.locator('#save-status')).toHaveText('保存済み: cli-map.json');
+    expect(await page.evaluate(()=>fetch('/api/initial-map?token=incorrect').then(response=>response.status))).toBe(404);
+  } finally {
+    cli.kill();
+    await fs.rm(tempDirectory,{recursive:true,force:true});
+  }
 });
 
 test('save status changes after editing and JSON export', async ({ page }) => {

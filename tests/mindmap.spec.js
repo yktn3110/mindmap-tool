@@ -201,7 +201,8 @@ test('undo and redo restore a node added with the keyboard shortcut', async ({ p
   await page.keyboard.press('Control+Z');
   await expect(nodes).toHaveCount(initialCount);
   await expect(page.locator('#redo-btn')).toBeEnabled();
-  await page.keyboard.press('Control+Shift+Z');
+  await expect(page.locator('#redo-btn')).toHaveAttribute('title','やり直す (Ctrl+Y)');
+  await page.keyboard.press('Control+Y');
   await expect(nodes).toHaveCount(initialCount + 1);
 });
 
@@ -366,6 +367,28 @@ test('siblings can be reordered, saved, and restored with undo', async ({ page }
     return {first:position('やりたいこと'),target:position('調べること')};
   });
   expect(restored.first).toBeLessThan(restored.target);
+});
+
+test('Alt+ArrowUp and Alt+ArrowDown reorder the selected sibling', async ({ page }) => {
+  const first=page.locator('.node').filter({hasText:'やりたいこと'});
+  const target=page.locator('.node').filter({hasText:'調べること'});
+  await target.click();
+  await page.keyboard.press('Alt+ArrowUp');
+  let positions=await page.evaluate(() => {const position=text=>Number.parseFloat([...document.querySelectorAll('.node')].find(item=>item.textContent.includes(text)).style.left);return {first:position('やりたいこと'),target:position('調べること')};});
+  expect(positions.target).toBeLessThan(positions.first);
+  await page.keyboard.press('Alt+ArrowDown');
+  positions=await page.evaluate(() => {const position=text=>Number.parseFloat([...document.querySelectorAll('.node')].find(item=>item.textContent.includes(text)).style.left);return {first:position('やりたいこと'),target:position('調べること')};});
+  expect(positions.first).toBeLessThan(positions.target);
+});
+
+test('tree layout treats a collapsed node as a single visible leaf', async ({ page }) => {
+  const collapsed=page.locator('.node').filter({hasText:'やりたいこと'});
+  await collapsed.click();
+  await collapsed.locator('.collapse-toggle').click();
+  await page.locator('#auto-layout').click();
+  const positions=await page.evaluate(() => {const position=text=>Number.parseFloat([...document.querySelectorAll('.node')].find(item=>item.textContent.includes(text)).style.left);return {collapsed:position('やりたいこと'),next:position('調べること')};});
+  expect(positions.collapsed).toBe(90);
+  expect(positions.next).toBe(280);
 });
 
 test('new child placement follows the active layout direction', async ({ page }) => {

@@ -67,7 +67,7 @@ function setLayoutButton(type){ $('#auto-layout').classList.toggle('active',type
 function layoutMap(type){
   const leaves=[];
   const children=childrenOf;
-  const place=(node,depth)=>{ const kids=children(node.id); if(!kids.length){ if(type==='tree')node.x=90+leaves.length*190; else node.y=90+leaves.length*105; leaves.push(node); } else { kids.forEach(k=>place(k,depth+1)); if(type==='tree')node.x=kids.reduce((sum,k)=>sum+k.x,0)/kids.length; else node.y=kids.reduce((sum,k)=>sum+k.y,0)/kids.length; } if(type==='tree')node.y=90+depth*125; else node.x=90+depth*210; };
+  const place=(node,depth)=>{ const kids=node.collapsed ? [] : children(node.id); if(!kids.length){ if(type==='tree')node.x=90+leaves.length*190; else node.y=90+leaves.length*105; leaves.push(node); } else { kids.forEach(k=>place(k,depth+1)); if(type==='tree')node.x=kids.reduce((sum,k)=>sum+k.x,0)/kids.length; else node.y=kids.reduce((sum,k)=>sum+k.y,0)/kids.length; } if(type==='tree')node.y=90+depth*125; else node.x=90+depth*210; };
   const root=map.nodes.find(n=>!n.parent); if(root)place(root,0);
 }
 function autoLayout(type='tree'){
@@ -249,8 +249,10 @@ $('#export-btn').onclick=saveAs;$('#overwrite-btn').onclick=saveOverwrite;$('#im
 $('#auto-save-btn').onclick=toggleAutoSave;
 document.addEventListener('keydown',e=>{
   if(document.activeElement.isContentEditable || document.activeElement.matches('input, textarea, select')) return;
-  if((e.ctrlKey||e.metaKey) && !e.altKey && e.key.toLowerCase()==='z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); }
-  else if((e.ctrlKey||e.metaKey) && !e.altKey && e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); }
+  if((e.ctrlKey||e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); }
+  else if((e.ctrlKey||e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); }
+  else if(e.altKey && !e.ctrlKey && !e.metaKey && e.key==='ArrowUp'){ e.preventDefault(); moveSibling(-1); }
+  else if(e.altKey && !e.ctrlKey && !e.metaKey && e.key==='ArrowDown'){ e.preventDefault(); moveSibling(1); }
   else if(e.key==='Tab'){ e.preventDefault(); addNode(); }
   else if(e.key==='Enter'){ e.preventDefault(); addNode(true); }
   else if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); remove(); }

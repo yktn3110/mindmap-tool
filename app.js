@@ -174,16 +174,18 @@ function editNode(id,el,selectAll=true){
     persist();
     recordChange(before);
   };
-  el.addEventListener('blur',finish,{once:true});
-  el.addEventListener('keydown',e=>{
+  const onKeydown=e=>{
     if(e.key==='Enter'&&e.shiftKey){ e.preventDefault(); insertLineBreak(el); }
     else if(e.key==='Enter'){ e.preventDefault(); el.blur(); }
     if(e.key==='Tab'){
       e.preventDefault();
+      e.stopPropagation();
       el.blur();
       requestAnimationFrame(()=>addNode());
     }
-  });
+  };
+  el.addEventListener('blur',()=>{el.removeEventListener('keydown',onKeydown);finish();},{once:true});
+  el.addEventListener('keydown',onKeydown);
 }
 function addNode(sibling=false){ const before=copyMap(); const base=get(selectedId)||get('root'); const parent=sibling ? get(base.parent)||base : base; const siblings=childrenOf(parent.id); const index=siblings.length; const node={id:crypto.randomUUID(),text:'新しいノード',parent:parent.id,order:index,x:currentLayout==='horizontal'?parent.x+210:parent.x+index*145,y:currentLayout==='horizontal'?parent.y+index*92:parent.y+125}; map.nodes.push(node); selectedId=node.id; persist();recordChange(before);draw(); editNode(node.id,layer.querySelector(`[data-id="${node.id}"] .node-label`)); }
 function remove(){ const n=get(selectedId); if(!n||!n.parent){toast('中心ノードは削除できません');return;} const before=copyMap(); const ids=new Set([n.id]); let changed=true; while(changed){changed=false;map.nodes.forEach(x=>{if(ids.has(x.parent)&&!ids.has(x.id)){ids.add(x.id);changed=true;}})} map.nodes=map.nodes.filter(x=>!ids.has(x.id));selectedId=n.parent;persist();recordChange(before);draw(); }

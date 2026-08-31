@@ -177,6 +177,19 @@ test('Tab adds a child while editing a node opened by double-click', async ({ pa
   await expect(nodes).toHaveCount(before + 1);
 });
 
+test('Tab adds only one child when node text remains selected after a previous edit', async ({ page }) => {
+  const nodes=page.locator('.node');
+  const node=page.locator('.node').filter({hasText:'やりたいこと'});
+  await node.dblclick();
+  await page.locator('#node-search').focus();
+  await node.dblclick();
+  await expect.poll(() => page.evaluate(() => window.getSelection().toString())).toBe('やりたいこと');
+  const before=await nodes.count();
+  await page.keyboard.press('Tab');
+  await expect(nodes).toHaveCount(before+1);
+  await expect(page.locator('.node-label[contenteditable="true"]')).toHaveCount(1);
+});
+
 test('undo and redo restore a node added with the keyboard shortcut', async ({ page }) => {
   const nodes = page.locator('.node');
   const root = page.locator('.node.root');

@@ -381,6 +381,39 @@ test('Alt+ArrowUp and Alt+ArrowDown reorder the selected sibling', async ({ page
   expect(positions.first).toBeLessThan(positions.target);
 });
 
+test('dragging a node onto another node moves it under that node', async ({ page }) => {
+  const source=page.locator('.node').filter({hasText:'アイデアをメモ'});
+  const target=page.locator('.node').filter({hasText:'調べること'});
+  const sourceBox=await source.boundingBox(),targetBox=await target.boundingBox();
+  await page.mouse.move(sourceBox.x+sourceBox.width/2,sourceBox.y+sourceBox.height/2);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x+targetBox.width/2,targetBox.y+targetBox.height/2,{steps:8});
+  await page.mouse.up();
+  await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'drag.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
+  await page.locator('#export-btn').click();
+  const saved=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[0]));
+  expect(saved.nodes.find(node=>node.id==='d').parent).toBe('b');
+  await page.keyboard.press('Control+Z');
+  await page.locator('#overwrite-btn').click();
+  const restored=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[1]));
+  expect(restored.nodes.find(node=>node.id==='d').parent).toBe('a');
+});
+
+test('dragging to a node upper edge changes sibling order', async ({ page }) => {
+  const source=page.locator('.node').filter({hasText:'次のアクション'});
+  const target=page.locator('.node').filter({hasText:'やりたいこと'});
+  const sourceBox=await source.boundingBox(),targetBox=await target.boundingBox();
+  await page.mouse.move(sourceBox.x+sourceBox.width/2,sourceBox.y+sourceBox.height/2);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x+targetBox.width/2,targetBox.y+3,{steps:8});
+  await page.mouse.up();
+  await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'drag-order.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
+  await page.locator('#export-btn').click();
+  const saved=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[0]));
+  expect(saved.nodes.find(node=>node.id==='c').order).toBe(0);
+  expect(saved.nodes.find(node=>node.id==='a').order).toBe(1);
+});
+
 test('tree layout treats a collapsed node as a single visible leaf', async ({ page }) => {
   const collapsed=page.locator('.node').filter({hasText:'やりたいこと'});
   await collapsed.click();

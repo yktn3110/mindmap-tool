@@ -200,13 +200,37 @@ function moveSibling(direction){
   siblings.forEach((item,position)=>item.order=position);
   layoutMap(currentLayout);persist();recordChange(before);draw();select(node.id);toast('兄弟ノードの順番を変更しました');
 }
+function descendantIds(id){const ids=new Set([id]);let changed=true;while(changed){changed=false;map.nodes.forEach(node=>{if(ids.has(node.parent)&&!ids.has(node.id)){ids.add(node.id);changed=true;}})}return ids;}
+function getDropTarget(event,node){
+  const targetElement=document.elementFromPoint(event.clientX,event.clientY)?.closest('.node');
+  const target=targetElement&&get(targetElement.dataset.id);
+  if(!target||target.id===node.id||descendantIds(node.id).has(target.id))return null;
+  const rect=targetElement.getBoundingClientRect(),relativeY=(event.clientY-rect.top)/rect.height;
+  const mode=target.parent&&relativeY<.25?'before':target.parent&&relativeY>.75?'after':'child';
+  return {targetId:target.id,mode};
+}
+function updateDropPreview(drop,nodeId){
+  layer.querySelectorAll('.node').forEach(element=>element.classList.remove('dragging','drop-child','drop-before','drop-after'));
+  layer.querySelector(`[data-id="${nodeId}"]`)?.classList.add('dragging');
+  if(drop)layer.querySelector(`[data-id="${drop.targetId}"]`)?.classList.add(`drop-${drop.mode}`);
+}
+function applyDrop(node,drop,before){
+  const target=get(drop.targetId);if(!target||descendantIds(node.id).has(target.id))return false;
+  const parentId=drop.mode==='child'?target.id:target.parent;if(!parentId)return false;
+  const siblings=childrenOf(parentId).filter(item=>item.id!==node.id);
+  let index=siblings.length;
+  if(drop.mode!=='child'){const targetIndex=siblings.findIndex(item=>item.id===target.id);if(targetIndex<0)return false;index=targetIndex+(drop.mode==='after'?1:0);}
+  node.parent=parentId;siblings.splice(index,0,node);siblings.forEach((item,position)=>item.order=position);
+  layoutMap(currentLayout);persist();recordChange(before);draw();select(node.id);toast(drop.mode==='child'?'ノードを子として移動しました':'兄弟ノードの順番を変更しました');
+  return true;
+}
 function startNodeDrag(e){
   const n=get(e.currentTarget.dataset.id);
   const label=e.target.closest('.node-label');
   if(label && selectedId===n.id && !label.isContentEditable && e.detail===1){ editNode(n.id,label,false); e.stopPropagation(); return; }
   if(e.target.contentEditable==='true'){ e.stopPropagation(); return; }
   e.stopPropagation();
-  drag={type:'node',node:n,startX:e.clientX,startY:e.clientY,x:n.x,y:n.y,moved:false,before:copyMap()};
+  drag={type:'node',node:n,startX:e.clientX,startY:e.clientY,x:n.x,y:n.y,moved:false,before:copyMap(),drop:null};
   canvas.focus({preventScroll:true});
 }
 canvas.addEventListener('mousedown',e=>{
@@ -221,15 +245,19 @@ window.addEventListener('mousemove',e=>{
   if(drag.type==='node'){
     drag.node.x=drag.x+dx/scale;
     drag.node.y=drag.y+dy/scale;
+    draw();
+    updateDropPreview(null,drag.node.id);
+    drag.drop=getDropTarget(e,drag.node);
+    updateDropPreview(drag.drop,drag.node.id);
   } else {
     pan={x:drag.x+dx,y:drag.y+dy};
+    draw();
   }
-  draw();
 });
 window.addEventListener('mouseup',()=>{
   if(!drag) return;
   if(drag.type==='node' && !drag.moved) select(drag.node.id);
-  if(drag.moved&&drag.type==='node'){ persist(); recordChange(drag.before); }
+  if(drag.moved&&drag.type==='node'&&!applyDrop(drag.node,drag.drop||{},drag.before)){persist();recordChange(drag.before);draw();select(drag.node.id);}
   drag=null;
 });
 canvas.addEventListener('wheel',e=>{e.preventDefault();scale=Math.max(.45,Math.min(1.8,scale+(e.deltaY<0?.08:-.08)));draw();},{passive:false});

@@ -27,7 +27,7 @@
       </div>
     </header>
 
-    <main>
+    <main id="workspace">
       <aside class="sidebar">
         <section>
           <p class="eyebrow">操作</p>
@@ -64,6 +64,7 @@
           <p>ノードをダブルクリックして編集。空白へドラッグで配置、ノード中央へドロップで子に移動、上下端で兄弟順を変更できます。</p>
         </section>
       </aside>
+      <button id="sidebar-toggle" type="button" aria-label="サイドバーを縮小" aria-pressed="false" title="サイドバーを縮小">‹</button>
       <section id="canvas" aria-label="マインドマップのキャンバス" tabindex="0">
         <svg id="connections" aria-hidden="true"></svg>
         <div id="node-layer"></div>

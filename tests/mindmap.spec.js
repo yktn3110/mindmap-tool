@@ -498,6 +498,20 @@ test('the sidebar scrolls and its sections do not overlap', async ({ page }) => 
   expect(options.y + options.height).toBeLessThanOrEqual(tips.y);
 });
 
+test('sidebar can be collapsed and expanded', async ({ page }) => {
+  const workspace=page.locator('#workspace'),sidebar=page.locator('.sidebar'),toggle=page.locator('#sidebar-toggle');
+  await toggle.click();
+  await expect(workspace).toHaveClass(/sidebar-collapsed/);
+  await expect(toggle).toHaveAttribute('aria-label','サイドバーを広げる');
+  await expect(sidebar).toHaveCSS('width','54px');
+  await expect(page.locator('.node-options')).toBeHidden();
+  await toggle.click();
+  await expect(workspace).not.toHaveClass(/sidebar-collapsed/);
+  await expect(toggle).toHaveAttribute('aria-label','サイドバーを縮小');
+  await expect(sidebar).toHaveCSS('width','232px');
+  await expect(page.locator('.node-options')).toBeVisible();
+});
+
 test('dragging blank canvas pans the map', async ({ page }) => {
   const layer = page.locator('#node-layer');
   const before = await layer.evaluate(el => el.style.transform);

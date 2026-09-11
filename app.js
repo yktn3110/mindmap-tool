@@ -264,8 +264,10 @@ window.addEventListener('mouseup',()=>{
 });
 canvas.addEventListener('wheel',e=>{e.preventDefault();scale=Math.max(.45,Math.min(1.8,scale+(e.deltaY<0?.08:-.08)));draw();},{passive:false});
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800);}
+function toggleSidebar(){const workspace=$('#workspace'),collapsed=workspace.classList.toggle('sidebar-collapsed'),button=$('#sidebar-toggle'),label=collapsed?'サイドバーを広げる':'サイドバーを縮小';button.setAttribute('aria-pressed',String(collapsed));button.setAttribute('aria-label',label);button.title=label;}
 $('#add-child').onclick=()=>addNode();$('#add-sibling').onclick=()=>addNode(true);$('#delete-node').onclick=remove;$('#move-node-up').onclick=()=>moveSibling(-1);$('#move-node-down').onclick=()=>moveSibling(1);$('#undo-btn').onclick=undo;$('#redo-btn').onclick=redo;$('#zoom-in').onclick=()=>{scale=Math.min(1.8,scale+.1);draw()};$('#zoom-out').onclick=()=>{scale=Math.max(.45,scale-.1);draw()};$('#fit-view').onclick=fitView;
 $('#cut-node').onclick=cutNode;$('#paste-node').onclick=pasteNode;
+$('#sidebar-toggle').onclick=toggleSidebar;
 $('#auto-layout').onclick=()=>autoLayout('tree');$('#horizontal-layout').onclick=()=>autoLayout('horizontal');
 $('#export-png-btn').onclick=exportPng;$('#export-pdf-btn').onclick=exportPdf;
 $('#color-picker').onclick=e=>{if(!e.target.matches('button[data-color]')||!get(selectedId))return;const before=copyMap();get(selectedId).color=e.target.dataset.color||undefined;persist();recordChange(before);draw();select(selectedId);};$('#node-icon').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).icon=e.target.value;persist();recordChange(before);draw();select(selectedId);};$('#node-note').onchange=e=>{if(!get(selectedId))return;const before=copyMap();get(selectedId).note=e.target.value;persist();recordChange(before);draw();select(selectedId);};

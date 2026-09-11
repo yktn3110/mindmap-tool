@@ -18,23 +18,23 @@
           <button id="undo-btn" class="history-button" title="元に戻す (Ctrl+Z)" aria-label="元に戻す (Ctrl+Z)" disabled>↶</button>
           <button id="redo-btn" class="history-button" title="やり直す (Ctrl+Y)" aria-label="やり直す (Ctrl+Y)" disabled>↷</button>
         </div>
+        <button id="import-btn" class="header-text-button">開く</button>
+        <button id="export-btn" class="header-text-button" title="名前を付けて保存">新規保存</button>
+        <button id="overwrite-btn" class="header-text-button" title="上書き保存" disabled>保存</button>
         <details id="file-menu" class="action-menu">
-          <summary>ファイル</summary>
-          <div class="menu-panel" role="group" aria-label="ファイル操作">
-            <button id="import-btn" class="quiet">開く</button>
-            <button id="export-btn" class="save-button">名前を付けて保存</button>
-            <button id="overwrite-btn" class="quiet" disabled>上書き保存</button>
+          <summary aria-label="保存設定" title="保存設定">…</summary>
+          <div class="menu-panel" role="group" aria-label="保存設定">
             <button id="auto-save-btn" class="quiet" aria-pressed="false">自動保存 OFF</button>
           </div>
         </details>
         <details id="export-menu" class="action-menu">
-          <summary>書き出す</summary>
+          <summary>エクスポート</summary>
           <div class="menu-panel" role="group" aria-label="書き出し形式">
             <button id="export-png-btn" class="quiet">PNG画像</button>
             <button id="export-pdf-btn" class="quiet">PDF</button>
           </div>
         </details>
-        <button id="new-btn" class="primary">＋ 新しいマップ</button>
+        <button id="new-btn" class="new-map-button">＋ 新規</button>
         <input id="file-input" type="file" accept="application/json" hidden />
       </div>
     </header>

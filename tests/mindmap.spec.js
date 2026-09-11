@@ -36,12 +36,18 @@ test('Tab adds a child node instead of moving browser focus', async ({ page }) =
   await expect(nodes.filter({ hasText: '新しいノード' })).toHaveCount(1);
 });
 
-test('header groups file and export actions into compact menus', async ({ page }) => {
+test('header keeps save actions visible and groups secondary actions into menus', async ({ page }) => {
   const fileMenu=page.locator('#file-menu'),exportMenu=page.locator('#export-menu');
-  await expect(page.locator('#import-btn')).toBeHidden();
+  await expect(page.locator('#import-btn')).toBeVisible();
+  await expect(page.locator('#export-btn')).toHaveText('新規保存');
+  await expect(page.locator('#overwrite-btn')).toBeDisabled();
+  await expect(page.locator('#export-btn')).toHaveCSS('background-color','rgb(234, 231, 255)');
+  await expect(page.locator('#new-btn')).toHaveCSS('background-color','rgb(104, 86, 233)');
+  await expect(page.locator('#export-menu summary')).toHaveText('エクスポート');
+  await expect(page.locator('#auto-save-btn')).toBeHidden();
   await expect(page.locator('#export-png-btn')).toBeHidden();
   await fileMenu.locator('summary').click();
-  await expect(page.locator('#import-btn')).toBeVisible();
+  await expect(page.locator('#auto-save-btn')).toBeVisible();
   await exportMenu.locator('summary').click();
   await expect(fileMenu).not.toHaveAttribute('open','');
   await expect(page.locator('#export-png-btn')).toBeVisible();
@@ -85,7 +91,7 @@ test('save status changes after editing and JSON export', async ({ page }) => {
   await page.keyboard.press('Tab');
   await expect(page.locator('#save-status')).toHaveText('未保存（新規）');
   await expect(page.locator('#save-status')).toHaveClass(/dirty/);
-  await expect(page.locator('#export-btn')).toHaveText('名前を付けて保存');
+  await expect(page.locator('#export-btn')).toHaveText('新規保存');
   await expect(page.locator('#import-btn')).toHaveText('開く');
   const downloadPromise=page.waitForEvent('download');
   await useHeaderAction(page,'#export-btn');

@@ -20,6 +20,13 @@ test.beforeEach(async ({ page }) => {
   await page.reload();
 });
 
+async function useHeaderAction(page, selector) {
+  const action=page.locator(selector);
+  const menu=action.locator('xpath=ancestor::details[1]');
+  if(await menu.count() && !(await menu.evaluate(element=>element.open))) await menu.locator('summary').click();
+  await action.click();
+}
+
 test('Tab adds a child node instead of moving browser focus', async ({ page }) => {
   const nodes = page.locator('.node');
   await nodes.first().click();
@@ -27,6 +34,18 @@ test('Tab adds a child node instead of moving browser focus', async ({ page }) =
   await page.keyboard.press('Tab');
   await expect(nodes).toHaveCount(before + 1);
   await expect(nodes.filter({ hasText: '新しいノード' })).toHaveCount(1);
+});
+
+test('header groups file and export actions into compact menus', async ({ page }) => {
+  const fileMenu=page.locator('#file-menu'),exportMenu=page.locator('#export-menu');
+  await expect(page.locator('#import-btn')).toBeHidden();
+  await expect(page.locator('#export-png-btn')).toBeHidden();
+  await fileMenu.locator('summary').click();
+  await expect(page.locator('#import-btn')).toBeVisible();
+  await exportMenu.locator('summary').click();
+  await expect(fileMenu).not.toHaveAttribute('open','');
+  await expect(page.locator('#export-png-btn')).toBeVisible();
+  await expect(page.locator('#undo-btn')).toHaveAttribute('aria-label','元に戻す (Ctrl+Z)');
 });
 
 test('CLI opens a specified map when it starts', async ({ page }) => {
@@ -49,7 +68,7 @@ test('CLI opens a specified map when it starts', async ({ page }) => {
     await expect(page.locator('#overwrite-btn')).toBeEnabled();
     await page.locator('.node.root').click();
     await page.keyboard.press('Tab');
-    await page.locator('#overwrite-btn').click();
+    await useHeaderAction(page,'#overwrite-btn');
     await expect.poll(async()=>JSON.parse(await fs.readFile(mapPath,'utf8')).nodes.length).toBe(2);
     await expect(page.locator('#save-status')).toHaveText(/保存済み/);
     expect(await page.evaluate(()=>fetch('/api/initial-map?token=incorrect').then(response=>response.status))).toBe(404);
@@ -69,7 +88,7 @@ test('save status changes after editing and JSON export', async ({ page }) => {
   await expect(page.locator('#export-btn')).toHaveText('名前を付けて保存');
   await expect(page.locator('#import-btn')).toHaveText('開く');
   const downloadPromise=page.waitForEvent('download');
-  await page.locator('#export-btn').click();
+  await useHeaderAction(page,'#export-btn');
   await downloadPromise;
   await expect(page.locator('#save-status')).toHaveText(/保存済み/);
   await expect(page.locator('#save-status')).not.toHaveClass(/dirty/);
@@ -79,19 +98,19 @@ test('save as enables overwriting the same JSON file', async ({ page }) => {
   await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'test-map.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
   await page.locator('.node.root').click();
   await page.keyboard.press('Tab');
-  await page.locator('#export-btn').click();
+  await useHeaderAction(page,'#export-btn');
   await expect(page.locator('#overwrite-btn')).toBeEnabled();
-  await page.locator('#overwrite-btn').click();
+  await useHeaderAction(page,'#overwrite-btn');
   await expect.poll(()=>page.evaluate(()=>window.__mindflowWrites.length)).toBe(2);
   await expect.poll(()=>page.evaluate(()=>JSON.parse(window.__mindflowWrites[1]).nodes.some(node=>node.text==='新しいノード'))).toBeTruthy();
 });
 
 test('auto save writes unsaved changes every three minutes when enabled', async ({ page }) => {
   await page.evaluate(() => {window.__mindflowWrites=[];window.__autoSaveCallback=null;window.showSaveFilePicker=async()=>({name:'map.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});window.setInterval=(callback,delay)=>{window.__autoSaveCallback=callback;window.__autoSaveDelay=delay;return 1;};});
-  await page.locator('#export-btn').click();
+  await useHeaderAction(page,'#export-btn');
   await page.locator('.node.root').click();
   await page.keyboard.press('Tab');
-  await page.locator('#auto-save-btn').click();
+  await useHeaderAction(page,'#auto-save-btn');
   await expect(page.locator('#auto-save-btn')).toHaveText('自動保存 ON');
   expect(await page.evaluate(()=>window.__autoSaveDelay)).toBe(180000);
   await page.evaluate(()=>window.__autoSaveCallback());
@@ -138,7 +157,7 @@ test('opening a map with the default title uses its filename as the title', asyn
 
 test('opening a file in Chrome mode sets the title and enables overwrite save', async ({ page }) => {
   await page.evaluate(() => {const content=JSON.stringify({title:'既存ファイル',nodes:[{id:'root',text:'既存ノード',x:100,y:100,parent:null}]});window.showOpenFilePicker=async()=>[{name:'existing.json',getFile:async()=>new File([content],'existing.json',{type:'application/json'}),createWritable:async()=>({write:async()=>{},close:async()=>{}})}];});
-  await page.locator('#import-btn').click();
+  await useHeaderAction(page,'#import-btn');
   await expect(page.locator('#map-title')).toHaveValue('existing');
   await expect(page.locator('#overwrite-btn')).toBeEnabled();
   await expect(page.locator('.node.root')).toHaveText('既存ノード');
@@ -148,12 +167,12 @@ test('opening a file in Chrome mode sets the title and enables overwrite save', 
 
 test('open, add a node, and overwrite save updates the opened file', async ({ page }) => {
   await page.evaluate(() => {const content=JSON.stringify({title:'作業中のマップ',nodes:[{id:'root',text:'中心',x:100,y:100,parent:null}]});window.__openedFileWrites=[];window.showOpenFilePicker=async()=>[{name:'working-map.json',getFile:async()=>new File([content],'working-map.json',{type:'application/json'}),createWritable:async()=>({write:async value=>window.__openedFileWrites.push(value),close:async()=>{}})}];});
-  await page.locator('#import-btn').click();
+  await useHeaderAction(page,'#import-btn');
   await page.locator('.node.root').click();
   await page.keyboard.press('Tab');
   await expect(page.locator('#save-status')).toHaveText('更新あり');
   await expect(page.locator('#save-status')).toHaveClass(/dirty/);
-  await page.locator('#overwrite-btn').click();
+  await useHeaderAction(page,'#overwrite-btn');
   await expect.poll(()=>page.evaluate(()=>window.__openedFileWrites.length)).toBe(1);
   const saved=await page.evaluate(()=>JSON.parse(window.__openedFileWrites[0]));
   expect(saved.title).toBeUndefined();
@@ -230,7 +249,7 @@ test('cut and paste reattaches a node under a different parent', async ({ page }
   await page.locator('.node').filter({hasText:'調べること'}).click();
   await page.locator('#paste-node').click();
   await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'map.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
-  await page.locator('#export-btn').click();
+  await useHeaderAction(page,'#export-btn');
   const saved=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[0]));
   expect(saved.nodes.find(node=>node.text==='アイデアをメモ').parent).toBe('b');
 });
@@ -313,7 +332,7 @@ test('a node can have its color, icon, and note configured and exported', async 
   await expect(page.locator('#note-preview')).toBeVisible();
   await expect(page.locator('#note-preview-text')).toHaveText('次回までに調査する');
   const downloadPromise=page.waitForEvent('download');
-  await page.locator('#export-btn').click();
+  await useHeaderAction(page,'#export-btn');
   const download=await downloadPromise;
   const saved=JSON.parse(await fs.readFile(await download.path(),'utf8'));
   expect(saved.nodes.find(item=>item.text==='やりたいこと').note).toBe('次回までに調査する');
@@ -363,7 +382,7 @@ test('siblings can be reordered, saved, and restored with undo', async ({ page }
   expect(positions.target).toBeLessThan(positions.first);
   await expect(page.locator('#move-node-up')).toBeDisabled();
   await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'order.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
-  await page.locator('#export-btn').click();
+  await useHeaderAction(page,'#export-btn');
   const saved=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[0]));
   expect(saved.nodes.find(node=>node.id==='b').order).toBe(0);
   expect(saved.nodes.find(node=>node.id==='a').order).toBe(1);
@@ -396,11 +415,11 @@ test('dragging a node onto another node moves it under that node', async ({ page
   await page.mouse.move(targetBox.x+targetBox.width/2,targetBox.y+targetBox.height/2,{steps:8});
   await page.mouse.up();
   await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'drag.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
-  await page.locator('#export-btn').click();
+  await useHeaderAction(page,'#export-btn');
   const saved=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[0]));
   expect(saved.nodes.find(node=>node.id==='d').parent).toBe('b');
   await page.keyboard.press('Control+Z');
-  await page.locator('#overwrite-btn').click();
+  await useHeaderAction(page,'#overwrite-btn');
   const restored=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[1]));
   expect(restored.nodes.find(node=>node.id==='d').parent).toBe('a');
 });
@@ -414,7 +433,7 @@ test('dragging to a node upper edge changes sibling order', async ({ page }) => 
   await page.mouse.move(targetBox.x+targetBox.width/2,targetBox.y+3,{steps:8});
   await page.mouse.up();
   await page.evaluate(() => {window.__mindflowWrites=[];window.showSaveFilePicker=async()=>({name:'drag-order.json',createWritable:async()=>({write:async value=>window.__mindflowWrites.push(value),close:async()=>{}})});});
-  await page.locator('#export-btn').click();
+  await useHeaderAction(page,'#export-btn');
   const saved=await page.evaluate(()=>JSON.parse(window.__mindflowWrites[0]));
   expect(saved.nodes.find(node=>node.id==='c').order).toBe(0);
   expect(saved.nodes.find(node=>node.id==='a').order).toBe(1);
@@ -484,7 +503,7 @@ test('a parent node collapses and expands all of its descendants', async ({ page
 
 test('PNG export downloads a non-empty image file', async ({ page }) => {
   const downloadPromise = page.waitForEvent('download');
-  await page.locator('#export-png-btn').click();
+  await useHeaderAction(page,'#export-png-btn');
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.png$/);
   expect((await download.createReadStream()).readable).toBeTruthy();

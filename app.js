@@ -279,6 +279,10 @@ async function openInitialMapFromCli(){const token=new URLSearchParams(location.
 async function openMap(){if(!window.showOpenFilePicker){$('#file-input').click();return;}try{const [handle]=await window.showOpenFilePicker({types:[{description:'Mindflow map',accept:{'application/json':['.json']}}]});loadMapFile(await handle.getFile(),handle);}catch(error){if(error.name!=='AbortError')toast('ファイルを開けませんでした');}}
 $('#export-btn').onclick=saveAs;$('#overwrite-btn').onclick=saveOverwrite;$('#import-btn').onclick=openMap;$('#file-input').onchange=e=>{const f=e.target.files[0];if(f)loadMapFile(f);};
 $('#auto-save-btn').onclick=toggleAutoSave;
+document.querySelectorAll('.action-menu').forEach(menu=>{
+  menu.addEventListener('toggle',()=>{if(menu.open)document.querySelectorAll('.action-menu').forEach(other=>{if(other!==menu)other.open=false;});});
+  menu.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>{menu.open=false;}));
+});
 document.addEventListener('keydown',e=>{
   if(document.activeElement.isContentEditable || document.activeElement.matches('input, textarea, select')) return;
   if((e.ctrlKey||e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); }

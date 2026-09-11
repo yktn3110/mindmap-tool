@@ -500,15 +500,19 @@ test('the sidebar scrolls and its sections do not overlap', async ({ page }) => 
 
 test('sidebar can be collapsed and expanded', async ({ page }) => {
   const workspace=page.locator('#workspace'),sidebar=page.locator('.sidebar'),toggle=page.locator('#sidebar-toggle');
+  const isClearOfScrollbar=async()=>page.evaluate(()=>{const sidebar=document.querySelector('.sidebar').getBoundingClientRect(),toggle=document.querySelector('#sidebar-toggle').getBoundingClientRect();return toggle.right<=sidebar.right-16;});
+  expect(await isClearOfScrollbar()).toBeTruthy();
   await toggle.click();
   await expect(workspace).toHaveClass(/sidebar-collapsed/);
   await expect(toggle).toHaveAttribute('aria-label','サイドバーを広げる');
   await expect(sidebar).toHaveCSS('width','54px');
+  expect(await isClearOfScrollbar()).toBeTruthy();
   await expect(page.locator('.node-options')).toBeHidden();
   await toggle.click();
   await expect(workspace).not.toHaveClass(/sidebar-collapsed/);
   await expect(toggle).toHaveAttribute('aria-label','サイドバーを縮小');
   await expect(sidebar).toHaveCSS('width','232px');
+  expect(await isClearOfScrollbar()).toBeTruthy();
   await expect(page.locator('.node-options')).toBeVisible();
 });
 

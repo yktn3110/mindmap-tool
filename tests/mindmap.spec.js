@@ -46,6 +46,12 @@ test('CLI opens a specified map when it starts', async ({ page }) => {
     await expect(page.locator('#map-title')).toHaveValue('cli-map');
     await expect(page.locator('.node.root')).toHaveText('CLIで開いたマップ');
     await expect(page.locator('#save-status')).toHaveText('保存済み: cli-map.json');
+    await expect(page.locator('#overwrite-btn')).toBeEnabled();
+    await page.locator('.node.root').click();
+    await page.keyboard.press('Tab');
+    await page.locator('#overwrite-btn').click();
+    await expect.poll(async()=>JSON.parse(await fs.readFile(mapPath,'utf8')).nodes.length).toBe(2);
+    await expect(page.locator('#save-status')).toHaveText(/保存済み/);
     expect(await page.evaluate(()=>fetch('/api/initial-map?token=incorrect').then(response=>response.status))).toBe(404);
   } finally {
     cli.kill();

@@ -25,7 +25,7 @@ try {
 }
 
 const token = randomBytes(24).toString('hex');
-const server = createMindflowServer({ initialMap:{ token, filename:basename(absolutePath), map } });
+const server = createMindflowServer({ initialMap:{ token, filename:basename(absolutePath), filePath:absolutePath, map } });
 server.listen(0, '127.0.0.1', () => {
   const { port } = server.address();
   const url = `http://127.0.0.1:${port}/?initial-map=${token}`;
